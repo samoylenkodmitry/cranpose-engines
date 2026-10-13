@@ -43,6 +43,7 @@ pub struct BevyView {
     frames: ExternalFrames,
     runner: Runner,
     shown: Cell<u64>,
+    max_density: Cell<f32>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -78,7 +79,20 @@ impl BevyView {
             frames,
             runner,
             shown: Cell::new(0),
+            max_density: Cell::new(f32::INFINITY),
         })
+    }
+
+    /// Lets [`crate::BevyScene`] ask Bevy for at most `density` pixels per
+    /// dp, and scale Bevy's frames up to the view. A phone's screen has two
+    /// to three pixels per dp; rendering 3D at 1.5 costs half or less.
+    pub fn set_max_density(&self, density: f32) {
+        self.max_density.set(density);
+    }
+
+    /// The most pixels per dp [`crate::BevyScene`] asks Bevy for.
+    pub fn max_density(&self) -> f32 {
+        self.max_density.get()
     }
 
     /// Asks Bevy for frames of `width` by `height` pixels, lets it run one

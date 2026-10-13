@@ -63,5 +63,7 @@ jobs:
         run: scripts/check-templates.py
       - name: Web examples
         run: |
-          cargo clippy --locked --target wasm32-unknown-unknown -p bevy-in-cranpose --no-default-features --features web -- -D warnings
-          cargo clippy --locked --target wasm32-unknown-unknown -p cranpose-hud-bevy --features web -- -D warnings
+          for build in webgpu webgl2; do
+            cargo clippy --locked --target wasm32-unknown-unknown -p bevy-in-cranpose --no-default-features --features $build -- -D warnings
+            cargo clippy --locked --target wasm32-unknown-unknown -p cranpose-hud-bevy --features $build -- -D warnings
+          done

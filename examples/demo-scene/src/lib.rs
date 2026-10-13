@@ -5,18 +5,22 @@ use bevy::{
     camera::{Exposure, Hdr, RenderTarget},
     image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor},
     light::{
-        Atmosphere, AtmosphereEnvironmentMapLight, CascadeShadowConfigBuilder, NotShadowCaster,
-        atmosphere::ScatteringMedium, light_consts::lux,
+        CascadeShadowConfigBuilder, DirectionalLightShadowMap, NotShadowCaster, light_consts::lux,
     },
     math::Affine2,
     mesh::{Indices, PrimitiveTopology},
-    pbr::{AtmosphereSettings, DistanceFog, FogFalloff},
+    pbr::{DistanceFog, FogFalloff},
     post_process::bloom::Bloom,
     prelude::*,
     render::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
         view::Tonemapping,
     },
+};
+#[cfg(not(feature = "webgl2"))]
+use bevy::{
+    light::{Atmosphere, AtmosphereEnvironmentMapLight, atmosphere::ScatteringMedium},
+    pbr::AtmosphereSettings,
 };
 use demo_ui::Controls;
 use nature::{MeshData, Stride, Terrain, Valley, Walker};
@@ -43,7 +47,19 @@ struct Explorer {
 #[derive(Resource)]
 struct WaterMaterial(Handle<StandardMaterial>);
 
-pub fn build(app: &mut App, target: RenderTarget) {
+/// How much the scene asks of the GPU.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Quality {
+    /// Four samples per pixel and shadow maps of 2048 pixels.
+    Full,
+    /// For phones, whose screens have two to three pixels per dp, which hide
+    /// the edges' steps: one sample per pixel and shadow maps of 1024
+    /// pixels, a quarter of the memory.
+    Phone,
+}
+
+/// Adds the valley and its camera, which renders into `target`.
+pub fn build(app: &mut App, target: RenderTarget, quality: Quality) {
     let valley = Valley::new(SEED);
     app.insert_resource(SceneControls::default())
         .init_resource::<SceneStats>()
@@ -57,20 +73,62 @@ pub fn build(app: &mut App, target: RenderTarget) {
             move |commands: Commands,
                   meshes: ResMut<Assets<Mesh>>,
                   materials: ResMut<Assets<StandardMaterial>>,
-                  images: ResMut<Assets<Image>>,
-                  media: ResMut<Assets<ScatteringMedium>>| {
+                  images: ResMut<Assets<Image>>| {
                 spawn(
                     commands,
                     meshes,
                     materials,
                     images,
-                    media,
                     &valley,
                     target.clone(),
+                    quality,
                 )
             },
         )
-        .add_systems(Update, (walk, sky, water));
+        .add_systems(Update, (walk, sun, water));
+    if quality == Quality::Phone {
+        app.insert_resource(DirectionalLightShadowMap { size: 1024 });
+    }
+    #[cfg(not(feature = "webgl2"))]
+    app.add_systems(Startup, atmosphere);
+    #[cfg(feature = "webgl2")]
+    app.add_systems(Update, plain_sky);
+}
+
+// The sky where compute shaders run: Bevy's atmosphere, which also lights the
+// scene.
+#[cfg(not(feature = "webgl2"))]
+fn atmosphere(mut commands: Commands, mut media: ResMut<Assets<ScatteringMedium>>) {
+    commands.spawn(Atmosphere::earth(
+        media.add(ScatteringMedium::earth(256, 256)),
+    ));
+}
+
+// The sky on WebGL2, which has no compute shaders: a color that follows the
+// sun, and an ambient light of that color for what the atmosphere's light
+// would fill in.
+#[cfg(feature = "webgl2")]
+fn plain_sky(
+    controls: Res<SceneControls>,
+    mut clear: ResMut<ClearColor>,
+    mut ambient: ResMut<GlobalAmbientLight>,
+    mut lights: Query<&mut DirectionalLight>,
+) {
+    if !controls.is_changed() {
+        return;
+    }
+    let sun = nature::sun(controls.time_of_day);
+    let day = (sun.toward[1] / 0.5).clamp(0.0, 1.0);
+    let dusk = Vec3::new(0.95, 0.55, 0.38);
+    let noon = Vec3::new(0.46, 0.66, 0.93);
+    let sky = dusk.lerp(noon, day) * (0.25 + 0.75 * sun.strength);
+    clear.0 = Color::srgb(sky.x, sky.y, sky.z);
+    ambient.color = clear.0;
+    ambient.brightness = 9_000.0 * sun.strength;
+    for mut light in &mut lights {
+        light.illuminance = lux::RAW_SUNLIGHT * sun.strength;
+        light.color = Color::linear_rgb(sun.color[0], sun.color[1], sun.color[2]);
+    }
 }
 
 fn mesh(data: &MeshData) -> Mesh {
@@ -133,23 +191,30 @@ fn spawn(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
-    mut media: ResMut<Assets<ScatteringMedium>>,
     valley: &Valley,
     target: RenderTarget,
+    quality: Quality,
 ) {
-    commands.spawn(Atmosphere::earth(
-        media.add(ScatteringMedium::earth(256, 256)),
-    ));
+    #[cfg(not(feature = "webgl2"))]
+    let sky = (
+        AtmosphereSettings::default(),
+        AtmosphereEnvironmentMapLight::default(),
+    );
+    #[cfg(feature = "webgl2")]
+    let sky = ();
     commands.spawn((
         Camera3d::default(),
         Hdr,
         target,
-        AtmosphereSettings::default(),
-        AtmosphereEnvironmentMapLight::default(),
+        sky,
         Exposure::SUNLIGHT,
         Tonemapping::AcesFitted,
         Bloom::NATURAL,
         DistanceFog::default(),
+        match quality {
+            Quality::Full => Msaa::Sample4,
+            Quality::Phone => Msaa::Off,
+        },
         Transform::default(),
     ));
     commands.spawn((
@@ -252,7 +317,8 @@ fn walk(
     let stride = Stride {
         forward: controls.walk.forward_axis(),
         right: controls.walk.right_axis(),
-        run: controls.walk.run,
+        turn: controls.walk.turn_axis(),
+        run: controls.walk.running(),
     };
     walker.step(terrain, stride, controls.yaw, time.delta_secs().min(0.1));
     let eye = Vec3::from(walker.eye());
@@ -269,7 +335,7 @@ fn walk(
     }
 }
 
-fn sky(
+fn sun(
     controls: Res<SceneControls>,
     mut lights: Query<&mut Transform, With<DirectionalLight>>,
     mut fogs: Query<&mut DistanceFog>,

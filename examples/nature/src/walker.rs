@@ -4,18 +4,26 @@ const EYE_HEIGHT: f32 = 1.7;
 const WALK_SPEED: f32 = 4.5;
 const RUN_SPEED: f32 = 10.0;
 const WADING_DEPTH: f32 = 0.9;
+// How fast a full turn input turns the walker, in radians per second.
+const TURN_SPEED: f32 = 1.6;
 
+/// One step's input: `forward` and `right` walk, `turn` turns the walker to
+/// the right, each from -1 to 1.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Stride {
     pub forward: f32,
     pub right: f32,
+    pub turn: f32,
     pub run: bool,
 }
 
+/// The walker's position and stamina. Its heading is the look's yaw plus
+/// what the turn input added.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Walker {
     pub position: [f32; 3],
     pub stamina: f32,
+    pub turned: f32,
 }
 
 impl Walker {
@@ -25,11 +33,14 @@ impl Walker {
         Self {
             position: [x, terrain.height(x, z), z],
             stamina: 1.0,
+            turned: 0.0,
         }
     }
 
+    /// Walks for `seconds`, with the look's `yaw`.
     pub fn step(&mut self, terrain: &Terrain, stride: Stride, yaw: f32, seconds: f32) {
-        let (sin, cos) = yaw.sin_cos();
+        self.turned += stride.turn * TURN_SPEED * seconds;
+        let (sin, cos) = self.heading(yaw).sin_cos();
         let mut direction = [
             cos * stride.forward - sin * stride.right,
             sin * stride.forward + cos * stride.right,
@@ -69,8 +80,14 @@ impl Walker {
         ]
     }
 
+    /// The direction the walker faces, for the look's `yaw`.
+    pub fn heading(&self, yaw: f32) -> f32 {
+        yaw + self.turned
+    }
+
     pub fn look_at(&self, yaw: f32, pitch: f32) -> [f32; 3] {
         let eye = self.eye();
+        let yaw = self.heading(yaw);
         [
             eye[0] + yaw.cos() * pitch.cos(),
             eye[1] + pitch.sin(),

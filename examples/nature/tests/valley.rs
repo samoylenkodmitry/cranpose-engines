@@ -38,6 +38,7 @@ fn walking_follows_the_ground_and_stays_in_the_valley() {
     let stride = Stride {
         forward: 1.0,
         right: 0.0,
+        turn: 0.0,
         run: true,
     };
     for _ in 0..2_000 {
@@ -47,4 +48,33 @@ fn walking_follows_the_ground_and_stays_in_the_valley() {
     assert!(x <= terrain.half_size - 8.0);
     assert!((y - terrain.height(x, z).max(terrain.water_level - 0.9)).abs() < 0.5);
     assert!(walker.stamina < 1.0);
+}
+
+#[test]
+fn turning_turns_the_walk_and_the_look() {
+    let terrain = Valley::new(7).terrain;
+    let mut walker = Walker::start(&terrain);
+    let turn = Stride {
+        turn: 1.0,
+        ..Stride::default()
+    };
+    for _ in 0..30 {
+        walker.step(&terrain, turn, 0.0, 1.0 / 60.0);
+    }
+    let heading = walker.heading(0.0);
+    assert!((heading - 0.8).abs() < 1e-4, "heading {heading}");
+
+    let [x0, _, z0] = walker.position;
+    let forward = Stride {
+        forward: 1.0,
+        ..Stride::default()
+    };
+    walker.step(&terrain, forward, 0.0, 0.1);
+    let [x1, _, z1] = walker.position;
+    let walked = (z1 - z0).atan2(x1 - x0);
+    assert!((walked - heading).abs() < 1e-3, "walked toward {walked}");
+
+    let [ex, _, ez] = walker.eye();
+    let [tx, _, tz] = walker.look_at(0.0, 0.0);
+    assert!(((tz - ez).atan2(tx - ex) - heading).abs() < 1e-3);
 }

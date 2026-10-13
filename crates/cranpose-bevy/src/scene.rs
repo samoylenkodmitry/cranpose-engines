@@ -28,13 +28,16 @@ pub fn rememberBevyView(
 }
 
 /// Shows the frames of `view` in the bounds `modifier` gives, and asks Bevy
-/// for frames of that size in physical pixels. Bevy runs one update for each
-/// frame this draws; the newest frame Bevy finished is shown.
+/// for frames of that size in physical pixels, or in
+/// [`BevyView::max_density`] pixels per dp where the screen has more. Bevy
+/// runs one update for each frame this draws; the newest frame Bevy finished
+/// is shown.
 #[composable]
 pub fn BevyScene(modifier: Modifier, view: Rc<BevyView>) {
     let frame = rememberMutableStateOf(|| None::<ImageBitmap>);
     let size = remember(|| Rc::new(Cell::new((0u32, 0u32)))).with(Rc::clone);
     let wanted = Rc::clone(&size);
+    let limited = Rc::clone(&view);
     FrameEffect((), true, move |_| {
         let (width, height) = wanted.get();
         if width > 0
@@ -47,7 +50,7 @@ pub fn BevyScene(modifier: Modifier, view: Rc<BevyView>) {
     Box(
         modifier.draw_behind(move |scope| {
             let bounds = scope.size();
-            let density = current_density();
+            let density = current_density().min(limited.max_density());
             size.set((
                 (bounds.width * density).round() as u32,
                 (bounds.height * density).round() as u32,

@@ -1,4 +1,5 @@
 mod hud;
+mod stick;
 mod window;
 
 use cranpose::{
@@ -7,11 +8,16 @@ use cranpose::{
     text::TextUnit,
 };
 pub use hud::{Hud, HudBridge, HudCommand, HudStates, Stats};
+pub use stick::TouchStick;
 pub use window::{
     EngineInfo, EngineWindow, HostedEngineWindow, TargetSize, WindowBridge, WindowStates,
     rememberWindowStates,
 };
 
+/// How far the stick is pushed before the walker runs.
+const RUN_PUSH: f32 = 0.9;
+
+/// The keys held and the touch stick: the stick's `x` turns, its `y` walks.
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Walk {
     pub forward: bool,
@@ -19,15 +25,24 @@ pub struct Walk {
     pub left: bool,
     pub right: bool,
     pub run: bool,
+    pub stick: [f32; 2],
 }
 
 impl Walk {
     pub fn forward_axis(&self) -> f32 {
-        f32::from(i8::from(self.forward) - i8::from(self.back))
+        (f32::from(i8::from(self.forward) - i8::from(self.back)) + self.stick[1]).clamp(-1.0, 1.0)
     }
 
     pub fn right_axis(&self) -> f32 {
         f32::from(i8::from(self.right) - i8::from(self.left))
+    }
+
+    pub fn turn_axis(&self) -> f32 {
+        self.stick[0]
+    }
+
+    pub fn running(&self) -> bool {
+        self.run || self.stick[0].hypot(self.stick[1]) >= RUN_PUSH
     }
 
     pub fn key(&mut self, key: KeyCode, down: bool) -> bool {
@@ -83,44 +98,61 @@ impl Controls {
     }
 }
 
+/// The scene's sliders. `compact` puts each label beside its slider, for
+/// phones.
 #[composable]
-fn SceneSliders(controls: MutableState<Controls>) {
-    Labeled("Time of day", move || {
-        LiquidSlider(
-            Modifier::empty().fill_max_width(),
-            controls.value().time_of_day,
-            move |value| controls.update(|c| c.time_of_day = value),
-        );
+fn SceneSliders(controls: MutableState<Controls>, compact: bool) {
+    Labeled("Time of day", compact, move |modifier| {
+        LiquidSlider(modifier, controls.value().time_of_day, move |value| {
+            controls.update(|c| c.time_of_day = value)
+        });
     });
-    Labeled("Fog", move || {
-        LiquidSlider(
-            Modifier::empty().fill_max_width(),
-            controls.value().fog,
-            move |value| controls.update(|c| c.fog = value),
-        );
+    Labeled("Fog", compact, move |modifier| {
+        LiquidSlider(modifier, controls.value().fog, move |value| {
+            controls.update(|c| c.fog = value)
+        });
     });
-    Labeled("Bloom", move || {
-        LiquidSlider(
-            Modifier::empty().fill_max_width(),
-            controls.value().bloom / 0.8,
-            move |value| controls.update(|c| c.bloom = value * 0.8),
-        );
+    Labeled("Bloom", compact, move |modifier| {
+        LiquidSlider(modifier, controls.value().bloom / 0.8, move |value| {
+            controls.update(|c| c.bloom = value * 0.8)
+        });
     });
 }
 
 #[composable]
-fn Labeled(label: &'static str, content: impl FnMut() + 'static) {
-    Column(
-        Modifier::empty().fill_max_width(),
-        ColumnSpec::default().vertical_arrangement(LinearArrangement::SpacedBy(4.0)),
-        move || {
-            Text(label, Modifier::empty(), text_style(14.0, Color::WHITE));
-            content();
-        },
-    );
+fn Labeled(label: &'static str, compact: bool, content: impl Fn(Modifier) + 'static) {
+    let label_style = text_style(14.0, Color::WHITE);
+    if compact {
+        Row(
+            Modifier::empty().fill_max_width(),
+            RowSpec::default()
+                .horizontal_arrangement(LinearArrangement::SpacedBy(12.0))
+                .vertical_alignment(VerticalAlignment::CenterVertically),
+            move || {
+                Text(label, Modifier::empty().width(92.0), label_style.clone());
+                content(Modifier::empty().weight(1.0));
+            },
+        );
+    } else {
+        Column(
+            Modifier::empty().fill_max_width(),
+            ColumnSpec::default().vertical_arrangement(LinearArrangement::SpacedBy(4.0)),
+            move || {
+                Text(label, Modifier::empty(), label_style.clone());
+                content(Modifier::empty().fill_max_width());
+            },
+        );
+    }
 }
 
-const WALK_HINT: &str = "WASD to walk, Shift to run, drag to look.";
+/// How to walk and look, for a keyboard and mouse or for touch.
+fn walk_hint(touch: bool) -> &'static str {
+    if touch {
+        "Drag to look. The stick walks and turns; push it to the edge to run."
+    } else {
+        "WASD to walk, Shift to run, drag to look."
+    }
+}
 
 const MUTED: Color = Color::from_rgb_u8(200, 206, 220);
 

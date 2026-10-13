@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{TITLE}}</title>
   <style>
     :root { color-scheme: dark; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0c0e16; overscroll-behavior: none; }
-    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; outline: none; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; outline: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 24px; background: #0c0e16; color: #e6e9ef; font: 400 0.95rem/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #boot[hidden] { display: none; }
     #boot .spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid rgba(230, 233, 239, 0.18); border-top-color: #8e7cff; animation: spin 0.9s linear infinite; }
-    #boot.error .detail { color: #ffb4b4; max-width: 34rem; }
+    #boot.error .detail { color: #ffb4b4; max-width: 34rem; overflow-wrap: anywhere; }
+    #boot button { font: inherit; color: #e6e9ef; background: #2a2f45; border: 1px solid #4a5170; border-radius: 999px; padding: 8px 20px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -23,25 +25,86 @@
   <script type="module">
     const boot = document.getElementById("boot");
 
-    function fail(message) {
+    // A Rust panic prints its message with console.error, then stops the
+    // module with a trap. The page shows the message when the trap arrives.
+    let panic = "";
+    const consoleError = console.error.bind(console);
+    console.error = (...parts) => {
+      const text = parts.map(String).join(" ");
+      if (text.startsWith("panicked at")) {
+        const [place, message = ""] = text.split("\n");
+        panic = `${message} (${place.replace("panicked at ", "").replace(/:$/, "")})`;
+      }
+      consoleError(...parts);
+    };
+
+    function fail(message, reload) {
+      boot.hidden = false;
       boot.classList.add("error");
       boot.querySelector(".spinner")?.remove();
       boot.querySelector(".detail").textContent = message;
+      if (reload && !boot.querySelector("button")) {
+        const button = document.createElement("button");
+        button.textContent = "Reload";
+        button.addEventListener("click", () => location.reload());
+        boot.append(button);
+      }
+    }
+
+    function stopped(error) {
+      fail(`The example stopped: ${panic || String(error?.message ?? error)}`, true);
+    }
+
+    // A browser can take the GPU away, for one when its GPU process runs
+    // out of memory and restarts. The example cannot go on without it.
+    function watchLostDevices() {
+      const lost = () => fail("The browser took the GPU device away from the example. Reload to start it again.", true);
+      if (window.GPUAdapter) {
+        const requestDevice = GPUAdapter.prototype.requestDevice;
+        GPUAdapter.prototype.requestDevice = async function (...args) {
+          const device = await requestDevice.apply(this, args);
+          device.lost.then((info) => info.reason !== "destroyed" && lost());
+          return device;
+        };
+      }
+      document.getElementById("app").addEventListener("webglcontextlost", lost);
+    }
+
+    // The build for this browser: WebGPU where it has an adapter, WebGL2
+    // otherwise.
+    async function build() {
+      try {
+        if (navigator.gpu && (await navigator.gpu.requestAdapter())) {
+          return "pkg";
+        }
+      } catch (error) {
+        console.warn("WebGPU is not available", error);
+      }
+      if (document.createElement("canvas").getContext("webgl2")) {
+        return "pkg-webgl2";
+      }
+      return null;
     }
 
     async function main() {
-      if (!("gpu" in navigator) || !(await navigator.gpu.requestAdapter())) {
-        throw new Error("This example needs WebGPU: Bevy's atmosphere runs compute shaders. Open it in Chrome, Edge or Safari 26.");
+      const folder = await build();
+      if (!folder) {
+        fail("This example needs WebGPU or WebGL2, and this browser has neither.", false);
+        return;
       }
-      const wasm = await import("./pkg/{{PACKAGE}}.js");
+      const touch = matchMedia("(pointer: coarse)").matches;
+      watchLostDevices();
+      const wasm = await import(`./${folder}/{{PACKAGE}}.js`);
       await wasm.default();
-      boot.remove();
-      await wasm.run_app();
+      boot.hidden = true;
+      window.addEventListener("error", (event) => stopped(event.error ?? event.message));
+      window.addEventListener("unhandledrejection", (event) => stopped(event.reason));
+      await wasm.run_app(touch);
     }
 
     main().catch((error) => {
       console.error(error);
-      fail(String(error && error.message ? error.message : error));
+      stopped(error);
     });
   </script>
 </body>
