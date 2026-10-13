@@ -30,7 +30,7 @@ impl INode for CranposeHudDemo {
         self.world = Some(world);
         let mut layer = CanvasLayer::new_alloc();
         self.base_mut().add_child(&layer);
-        let bridge = HudBridge::new("Godot");
+        let bridge = HudBridge::new("Godot", false);
         let content = bridge.clone();
         match Surface::new(&mut layer, true, move || demo_ui::Hud(content.clone())) {
             Ok(surface) => self.surface = Some(surface),
@@ -55,7 +55,10 @@ impl INode for CranposeHudDemo {
                     HudCommand::BackToStart => states.controls.update(Controls::back_to_start),
                 }
             }
-            let walk = held_walk();
+            let walk = Walk {
+                stick: states.controls.value().walk.stick,
+                ..held_walk()
+            };
             if states.controls.value().walk != walk {
                 states.controls.update(|controls| controls.walk = walk);
             }
@@ -124,5 +127,6 @@ fn held_walk() -> Walk {
         left: held([Key::A, Key::LEFT]),
         right: held([Key::D, Key::RIGHT]),
         run: held([Key::SHIFT, Key::SHIFT]),
+        stick: [0.0, 0.0],
     }
 }

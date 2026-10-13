@@ -21,8 +21,10 @@ them as GPU textures; no pixels go through the CPU.
 ## Try it
 
 The two Bevy examples run in the browser at
-[samoylenkodmitry.github.io/cranpose-engines](https://samoylenkodmitry.github.io/cranpose-engines/),
-with WebGPU (Chrome, Edge, Safari 26).
+[samoylenkodmitry.github.io/cranpose-engines](https://samoylenkodmitry.github.io/cranpose-engines/):
+on WebGPU where the browser has it (Chrome, Edge, Safari 26), and on WebGL2
+elsewhere, with a plain sky in place of the atmosphere, which needs compute
+shaders. On a phone the controls go under the view, and a stick walks.
 
 Each [release](https://github.com/samoylenkodmitry/cranpose-engines/releases)
 has the two Bevy examples for macOS, Linux and Windows, and the Godot example
@@ -91,7 +93,8 @@ wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0
 - **A Cranpose HUD in a Bevy game.** Add `CranposeHudPlugin::new(content)` and
   put `HudCamera` on the camera the HUD draws over. `content` gets Bevy's world
   once, to share state with the game, and returns the HUD's root composable.
-  `HudInput` tells the game whether the HUD took the pointer or the keys.
+  `HudInput` tells the game whether the HUD took the pointer, a finger or
+  the keys.
 - **A Cranpose HUD in Godot.** Depend on `cranpose-godot` (no patch needed),
   declare the extension with `cranpose_godot::godot_extension!(Extension)`, and
   give a node a `Surface` on a `CanvasLayer`. Call `draw` each frame and pass
@@ -124,7 +127,8 @@ The Godot projects keep
 import first.
 
 The web examples build with `scripts/build-web.sh` into `dist/web`, which any
-static file server can serve.
+static file server can serve. Each example has a WebGPU build in `pkg` and a
+WebGL2 build in `pkg-webgl2`; the page loads the one the browser runs.
 
 ## Where it runs
 
@@ -132,9 +136,10 @@ static file server can serve.
   builds use wgpu's Vulkan and D3D12 backends and are built by CI.
 - Godot in both directions: macOS with Godot's Metal driver. The bridge imports
   Godot's Metal objects; Vulkan and D3D12 are not bridged yet.
-- The web: the Bevy directions over WebGPU. Bevy updates inside Cranpose's
-  frame there, since a page has one thread. Godot's web export renders through
-  its own WebGL context, which is not bridged.
+- The web: the Bevy directions over WebGPU and WebGL2, tested in Chrome on
+  Android and in WebKit. Bevy updates inside Cranpose's frame there, since a
+  page has one thread. Godot's web export renders through its own WebGL
+  context, which is not bridged.
 
 Progress and the open work are tracked in
 [Cranpose#1412](https://github.com/samoylenkodmitry/Cranpose/issues/1412).
@@ -167,8 +172,10 @@ a package, so the re-export package is needed.
   only when the composition changed, while the render world reads the other.
   A pass after Bevy's upscaling blends the newest HUD over the camera's final
   image with premultiplied alpha, at the target's size from the same frame.
-  `HudInput` tells the game whether the HUD took the held press or the last
-  key.
+  `HudInput` tells the game whether the HUD took the held press, which
+  finger it took, and whether it took the last key. The HUD takes one finger
+  at a time, the first that lands on something of the HUD's, so the game can
+  follow the others.
 
 ## How Godot is bridged
 

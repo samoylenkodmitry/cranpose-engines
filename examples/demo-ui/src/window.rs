@@ -5,7 +5,7 @@ use std::{
 
 use cranpose::{liquid::prelude::*, prelude::*};
 
-use crate::{Controls, MUTED, SceneSliders, WALK_HINT, text_style};
+use crate::{Controls, MUTED, SceneSliders, TouchStick, text_style, walk_hint};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct EngineInfo {
@@ -19,6 +19,8 @@ pub struct WindowStates {
     pub controls: MutableState<Controls>,
     pub frame: MutableState<Option<ImageBitmap>>,
     pub fps: MutableState<u32>,
+    /// A finger touched the window, so it shows the touch stick and hints.
+    pub touch: MutableState<bool>,
 }
 
 #[derive(Clone, Default)]
@@ -30,12 +32,15 @@ impl PartialEq for TargetSize {
     }
 }
 
+/// The window's states. `touch` says whether the screen is a touch screen
+/// before the first touch tells.
 #[composable]
-pub fn rememberWindowStates() -> WindowStates {
+pub fn rememberWindowStates(touch: bool) -> WindowStates {
     remember(|| WindowStates {
         controls: mutableStateOf(Controls::default()),
         frame: mutableStateOf(None),
         fps: mutableStateOf(0),
+        touch: mutableStateOf(touch),
     })
     .with(|states| *states)
 }
@@ -54,7 +59,7 @@ impl PartialEq for WindowBridge {
 
 #[composable]
 pub fn HostedEngineWindow(engine: EngineInfo, bridge: WindowBridge) {
-    let states = rememberWindowStates();
+    let states = rememberWindowStates(false);
     bridge.states.get_or_init(|| states);
     let size = bridge.size.clone();
     EngineWindow(engine, states, move || {
@@ -89,75 +94,145 @@ fn FrameView(frame: MutableState<Option<ImageBitmap>>, target_size: TargetSize) 
     );
 }
 
+// Narrower than this, the controls go under the engine's view.
+const NARROW: f32 = 760.0;
+// Lower than this, the control panel leaves out the description and hint.
+const ROOMY: f32 = 600.0;
+
 /// The demo window: the scene controls beside `scene`, the engine's view,
-/// which fills its rounded frame under the glass.
+/// which fills its rounded frame under the glass. On a narrow screen, such as
+/// a phone held upright, the controls go under the view.
 #[composable]
 pub fn EngineWindow(engine: EngineInfo, states: WindowStates, scene: impl FnMut() + 'static) {
     let scene = Rc::new(RefCell::new(scene));
     LiquidTheme(crate::dark_theme(), move || {
         let scene = Rc::clone(&scene);
-        Row(
+        BoxWithConstraints(
             Modifier::empty()
                 .fill_max_size()
-                .background(Color::from_rgb_u8(12, 14, 22))
-                .padding(20.0),
-            RowSpec::default().horizontal_arrangement(LinearArrangement::SpacedBy(20.0)),
-            move || {
-                ControlPanel(engine, states.controls, states.fps);
+                .background(Color::from_rgb_u8(12, 14, 22)),
+            move |scope| {
+                let space = scope.constraints();
                 let scene = Rc::clone(&scene);
-                Viewport(engine, states.controls, move || (scene.borrow_mut())());
+                let show = move || (scene.borrow_mut())();
+                if space.max_width < NARROW {
+                    Column(
+                        Modifier::empty().fill_max_size().padding(12.0),
+                        ColumnSpec::default()
+                            .vertical_arrangement(LinearArrangement::SpacedBy(12.0)),
+                        move || {
+                            Viewport(
+                                Modifier::empty().weight(1.0).fill_max_width(),
+                                engine,
+                                states,
+                                true,
+                                show.clone(),
+                            );
+                            ControlPanel(Modifier::empty().fill_max_width(), engine, states, false);
+                        },
+                    );
+                } else {
+                    let roomy = space.max_height >= ROOMY;
+                    Row(
+                        Modifier::empty().fill_max_size().padding(20.0),
+                        RowSpec::default()
+                            .horizontal_arrangement(LinearArrangement::SpacedBy(20.0)),
+                        move || {
+                            ControlPanel(
+                                Modifier::empty().width(300.0).fill_max_height(),
+                                engine,
+                                states,
+                                roomy,
+                            );
+                            Viewport(
+                                Modifier::empty().weight(1.0).fill_max_height(),
+                                engine,
+                                states,
+                                false,
+                                show.clone(),
+                            );
+                        },
+                    );
+                }
             },
         );
     });
 }
 
+/// The engine's name, the scene's sliders and the frame rate. A `roomy`
+/// panel fills its height and adds the description and the walking hint.
 #[composable]
-fn ControlPanel(engine: EngineInfo, controls: MutableState<Controls>, fps: MutableState<u32>) {
-    LiquidCard(
-        Modifier::empty().width(300.0).fill_max_height(),
-        move || {
-            Column(
-                Modifier::empty().fill_max_size().padding(20.0),
-                ColumnSpec::default().vertical_arrangement(LinearArrangement::SpacedBy(14.0)),
-                move || {
-                    Text(
-                        format!("{} inside Cranpose", engine.name),
-                        Modifier::empty(),
-                        text_style(22.0, Color::WHITE),
-                    );
+fn ControlPanel(modifier: Modifier, engine: EngineInfo, states: WindowStates, roomy: bool) {
+    LiquidCard(modifier, move || {
+        let body = if roomy {
+            Modifier::empty().fill_max_size().padding(20.0)
+        } else {
+            Modifier::empty().fill_max_width().padding(16.0)
+        };
+        Column(
+            body,
+            ColumnSpec::default().vertical_arrangement(LinearArrangement::SpacedBy(if roomy {
+                14.0
+            } else {
+                10.0
+            })),
+            move || {
+                Text(
+                    format!("{} inside Cranpose", engine.name),
+                    Modifier::empty(),
+                    text_style(if roomy { 22.0 } else { 18.0 }, Color::WHITE),
+                );
+                if roomy {
                     Text(
                         engine.description,
                         Modifier::empty(),
                         text_style(13.0, MUTED),
                     );
-                    SceneSliders(controls);
+                }
+                SceneSliders(states.controls, !roomy);
+                if roomy {
                     Spacer(Modifier::empty().weight(1.0));
+                }
+                Text(
+                    format!("{} frames: {} per second", engine.name, states.fps.value()),
+                    Modifier::empty(),
+                    text_style(13.0, Color::from_rgb_u8(150, 220, 170)),
+                );
+                if roomy {
+                    let hint = walk_hint(states.touch.value());
                     Text(
-                        format!("{} frames: {} per second", engine.name, fps.value()),
-                        Modifier::empty(),
-                        text_style(13.0, Color::from_rgb_u8(150, 220, 170)),
-                    );
-                    Text(
-                        format!("Click the scene first. {WALK_HINT}"),
+                        if states.touch.value() {
+                            hint.to_string()
+                        } else {
+                            format!("Click the scene first. {hint}")
+                        },
                         Modifier::empty(),
                         text_style(13.0, MUTED),
                     );
-                },
-            );
-        },
-    );
+                }
+            },
+        );
+    });
 }
 
+/// The engine's view with glass over it: a caption, the button back to the
+/// start and, on a touch screen, the stick. `narrow` moves them for a phone.
 #[composable]
-fn Viewport(engine: EngineInfo, controls: MutableState<Controls>, scene: impl FnMut() + 'static) {
-    let shape = RoundedCornerShape::uniform(28.0);
-    let last = remember(|| Rc::new(Cell::new(None::<Point>))).with(Rc::clone);
+fn Viewport(
+    modifier: Modifier,
+    engine: EngineInfo,
+    states: WindowStates,
+    narrow: bool,
+    scene: impl FnMut() + 'static,
+) {
+    let controls = states.controls;
+    let shape = RoundedCornerShape::uniform(if narrow { 22.0 } else { 28.0 });
+    let last = remember(|| Rc::new(Cell::new(None::<(u64, Point)>))).with(Rc::clone);
     let focus = remember(FocusRequester::new).with(Clone::clone);
     let press_focus = focus.clone();
+    let inset = if narrow { 12.0 } else { 20.0 };
     Box(
-        Modifier::empty()
-            .weight(1.0)
-            .fill_max_height()
+        modifier
             .shadow_with(
                 18.0,
                 LayerShape::Rounded(shape),
@@ -176,27 +251,7 @@ fn Viewport(engine: EngineInfo, controls: MutableState<Controls>, scene: impl Fn
                         .await_pointer_event_scope(|events| async move {
                             loop {
                                 let event = events.await_pointer_event().await;
-                                match event.kind {
-                                    PointerEventKind::Down => {
-                                        let _ = focus.request_focus();
-                                        last.set(Some(event.position));
-                                    }
-                                    PointerEventKind::Move => {
-                                        if let Some(previous) = last.get() {
-                                            let (dx, dy) = (
-                                                event.position.x - previous.x,
-                                                event.position.y - previous.y,
-                                            );
-                                            controls.update(|c| c.look(dx, dy));
-                                            last.set(Some(event.position));
-                                            event.consume();
-                                        }
-                                    }
-                                    PointerEventKind::Up | PointerEventKind::Cancel => {
-                                        last.set(None)
-                                    }
-                                    _ => {}
-                                }
+                                look(&last, &focus, &event, states);
                             }
                         })
                         .await;
@@ -207,32 +262,45 @@ fn Viewport(engine: EngineInfo, controls: MutableState<Controls>, scene: impl Fn
             scene();
             GlassSurface(
                 Modifier::empty()
-                    .align(Alignment::BOTTOM_START)
-                    .padding(20.0)
-                    .width(380.0),
+                    .align(if narrow {
+                        Alignment::TOP_START
+                    } else {
+                        Alignment::BOTTOM_START
+                    })
+                    .padding(inset)
+                    .width_in(0.0, 380.0),
                 Glass::regular(),
                 move || {
                     Column(
-                        Modifier::empty().padding_symmetric(18.0, 14.0),
+                        Modifier::empty().padding_symmetric(if narrow { 14.0 } else { 18.0 }, 12.0),
                         ColumnSpec::default()
                             .vertical_arrangement(LinearArrangement::SpacedBy(4.0)),
                         move || {
                             Text(
                                 format!("Glass over a {} frame", engine.name),
                                 Modifier::empty(),
-                                text_style(17.0, Color::WHITE),
+                                text_style(if narrow { 15.0 } else { 17.0 }, Color::WHITE),
                             );
                             Text(
                                 engine.features,
                                 Modifier::empty(),
-                                text_style(13.0, Color::from_rgb_u8(225, 230, 240)),
+                                text_style(
+                                    if narrow { 12.0 } else { 13.0 },
+                                    Color::from_rgb_u8(225, 230, 240),
+                                ),
                             );
                         },
                     );
                 },
             );
             GlassButton(
-                Modifier::empty().align(Alignment::TOP_END).padding(20.0),
+                Modifier::empty()
+                    .align(if narrow {
+                        Alignment::BOTTOM_END
+                    } else {
+                        Alignment::TOP_END
+                    })
+                    .padding(inset),
                 GlassButtonSpec::glass(),
                 move || controls.update(Controls::back_to_start),
                 || {
@@ -243,8 +311,50 @@ fn Viewport(engine: EngineInfo, controls: MutableState<Controls>, scene: impl Fn
                     );
                 },
             );
+            if states.touch.value() {
+                TouchStick(
+                    Modifier::empty()
+                        .align(if narrow {
+                            Alignment::BOTTOM_START
+                        } else {
+                            Alignment::BOTTOM_END
+                        })
+                        .padding(inset),
+                    controls,
+                );
+            }
         },
     );
+}
+
+// Dragging the view looks around. The finger or button that pressed the view
+// looks until it lifts; a touch also turns on the touch stick.
+fn look(
+    last: &Cell<Option<(u64, Point)>>,
+    focus: &FocusRequester,
+    event: &PointerEvent,
+    states: WindowStates,
+) {
+    if event.source == PointerSource::Touch && !states.touch.value() {
+        states.touch.set(true);
+    }
+    match (event.kind, last.get()) {
+        (PointerEventKind::Down, None) if !event.is_consumed() => {
+            let _ = focus.request_focus();
+            last.set(Some((event.id, event.position)));
+        }
+        (PointerEventKind::Move, Some((id, previous))) if id == event.id => {
+            states
+                .controls
+                .update(|c| c.look(event.position.x - previous.x, event.position.y - previous.y));
+            last.set(Some((id, event.position)));
+            event.consume();
+        }
+        (PointerEventKind::Up | PointerEventKind::Cancel, Some((id, _))) if id == event.id => {
+            last.set(None)
+        }
+        _ => {}
+    }
 }
 
 fn walk_key(controls: MutableState<Controls>, event: &KeyEvent) -> bool {

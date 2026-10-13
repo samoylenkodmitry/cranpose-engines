@@ -17,7 +17,7 @@ pollster = "0.4"
 thiserror = "2"
 # Cranpose's wgpu fork by its own name, so a project that uses this crate
 # needs no patch of crates.io's wgpu.
-wgpu = { package = "cranpose-wgpu", version = "30.0.14", default-features = false, features = ["metal", "std", "wgsl"] }
+wgpu = { package = "cranpose-wgpu", version = "30.0.15", default-features = false, features = ["metal", "std", "wgsl"] }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 objc2 = "0.6.3"

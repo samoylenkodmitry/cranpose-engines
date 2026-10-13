@@ -7,7 +7,9 @@ use bevy::{
     input::{
         ButtonState,
         keyboard::{Key, KeyCode, KeyboardInput},
+        touch::{TouchInput, TouchPhase},
     },
+    math::Vec2,
     prelude::{
         App, Assets, Camera3d, ClearColor, Color as BevyColor, Commands, DefaultPlugins, Entity,
         Image, On, PluginGroup, ResMut, Startup, WindowPlugin, World, default,
@@ -157,4 +159,112 @@ fn keys_type_into_a_focused_hud_field_and_the_game_learns_the_hud_took_them() {
     app.update();
     assert_eq!(typed.lock().expect("typed").as_str(), "h");
     assert!(app.world().resource::<HudInput>().keyboard);
+}
+
+#[test]
+fn a_finger_on_the_hud_stays_the_huds_and_other_fingers_stay_the_games() {
+    let clicks: Arc<Mutex<u32>> = Arc::default();
+    let sink = Arc::clone(&clicks);
+    let (mut app, _) = hud_app(move |_| {
+        let sink = Arc::clone(&sink);
+        Box::new(move || {
+            let sink = Arc::clone(&sink);
+            Box(
+                Modifier::empty()
+                    .size(Size::new(24.0, 24.0))
+                    .clickable(move |_| {
+                        if let Ok(mut clicks) = sink.lock() {
+                            *clicks += 1;
+                        }
+                    }),
+                BoxSpec::default(),
+                || {},
+            );
+        })
+    });
+    for _ in 0..4 {
+        app.update();
+    }
+    let mut touch = |id: u64, phase: TouchPhase, x: f32, y: f32| {
+        app.world_mut().write_message(TouchInput {
+            phase,
+            position: Vec2::new(x, y),
+            window: Entity::PLACEHOLDER,
+            force: None,
+            id,
+        });
+        app.update();
+        app.world().resource::<HudInput>().finger
+    };
+    assert_eq!(touch(1, TouchPhase::Started, 10.0, 10.0), Some(1));
+    assert_eq!(touch(2, TouchPhase::Started, 50.0, 40.0), Some(1));
+    assert_eq!(touch(2, TouchPhase::Moved, 40.0, 30.0), Some(1));
+    assert_eq!(touch(1, TouchPhase::Ended, 10.0, 10.0), None);
+    assert_eq!(touch(2, TouchPhase::Ended, 40.0, 30.0), None);
+    assert_eq!(touch(3, TouchPhase::Started, 50.0, 40.0), None);
+    assert_eq!(touch(3, TouchPhase::Ended, 50.0, 40.0), None);
+    assert_eq!(*clicks.lock().expect("clicks"), 1);
+}
+
+#[test]
+fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
+    let (mut app, read) = hud_app(|_| {
+        Box::new(|| {
+            let shown = rememberMutableStateOf(|| true);
+            Column(
+                Modifier::empty().fill_max_size(),
+                ColumnSpec::default(),
+                move || {
+                    if shown.value() {
+                        Box(
+                            Modifier::empty()
+                                .size(Size::new(WIDTH as f32, 16.0))
+                                .background(Color::from_rgb_u8(255, 0, 0)),
+                            BoxSpec::default(),
+                            || {},
+                        );
+                    }
+                    Spacer(Modifier::empty().weight(1.0));
+                    Box(
+                        Modifier::empty()
+                            .size(Size::new(WIDTH as f32, 16.0))
+                            .clickable(move |_| shown.set(!shown.value())),
+                        BoxSpec::default(),
+                        || {},
+                    );
+                },
+            );
+        })
+    });
+    let top = |app: &mut App| {
+        for _ in 0..60 {
+            app.update();
+            if let Some(pixels) = read.lock().expect("readback").take() {
+                return pixel(&pixels, 8, 4);
+            }
+        }
+        panic!("no readback");
+    };
+    let mut seen = top(&mut app);
+    for _ in 0..30 {
+        if seen == RED {
+            break;
+        }
+        seen = top(&mut app);
+    }
+    assert_eq!(seen, RED, "the panel shows first");
+    for phase in [TouchPhase::Started, TouchPhase::Ended] {
+        app.world_mut().write_message(TouchInput {
+            phase,
+            position: Vec2::new(8.0, HEIGHT as f32 - 8.0),
+            window: Entity::PLACEHOLDER,
+            force: None,
+            id: 7,
+        });
+    }
+    let mut after = Vec::new();
+    for _ in 0..10 {
+        after.push(top(&mut app));
+    }
+    assert!(after.iter().skip(3).all(|seen| *seen == BLUE), "{after:?}");
 }

@@ -22,5 +22,10 @@ bevy = { workspace = true, features = [
 cranpose = { workspace = true, features = ["renderer-wgpu"] }
 wgpu = { workspace = true }
 
+# Bevy's PBR shaders name textures with `let`, which Safari's WGSL compiler
+# rejects; the fork rewrites those shaders for such browsers.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = { workspace = true, features = ["portable-wgsl"] }
+
 [dev-dependencies]
 cranpose = { workspace = true, features = ["renderer-wgpu"] }

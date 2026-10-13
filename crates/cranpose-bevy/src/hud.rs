@@ -3,10 +3,12 @@ use std::sync::Arc;
 use bevy::{
     asset::{embedded_asset, load_embedded_asset},
     core_pipeline::{FullscreenShader, schedule::Core3d, upscaling::upscaling},
+    ecs::system::SystemParam,
     input::{
         ButtonState,
         keyboard::{Key, KeyboardInput},
         mouse::{MouseButtonInput, MouseScrollUnit, MouseWheel},
+        touch::{TouchInput, TouchPhase},
     },
     prelude::*,
     render::{
@@ -30,7 +32,7 @@ use bevy::{
 };
 use cranpose::{
     AppLauncher, GpuContext, GuestView,
-    prelude::{KeyCode as CranposeKey, KeyEvent, KeyEventType, Modifiers},
+    prelude::{KeyCode as CranposeKey, KeyEvent, KeyEventType, Modifiers, PointerSource},
 };
 
 const HUD_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
@@ -44,8 +46,10 @@ type ContentFactory = dyn Fn(&mut World) -> Box<dyn FnMut()> + Send + Sync;
 /// Cranpose composes and draws on Bevy's main thread, into one of two
 /// textures, and only when the composition changed. Bevy's render world
 /// blends the other one, the newest finished HUD, over the camera's final
-/// image. Pointer, wheel and key input reach the composition first;
-/// [`HudInput`] says what it took.
+/// image. Pointer, touch, wheel and key input reach the composition first;
+/// [`HudInput`] says what it took. The HUD takes one finger at a time, the
+/// first that lands on something of the HUD's, so a game can follow the
+/// other fingers, such as one that looks around while the HUD's stick walks.
 pub struct CranposeHudPlugin {
     content: Arc<ContentFactory>,
 }
@@ -58,8 +62,10 @@ pub struct HudCamera;
 /// What the HUD took of this frame's input, for the game to leave alone.
 #[derive(Resource, Default, Clone, Copy)]
 pub struct HudInput {
-    /// The HUD took the press that is still held.
+    /// The HUD took the mouse press that is still held.
     pub pointer: bool,
+    /// The finger the HUD took, while it stays down.
+    pub finger: Option<u64>,
     /// The HUD took the last key press, such as typing into a focused
     /// field.
     pub keyboard: bool,
@@ -154,11 +160,17 @@ impl Plugin for CranposeHudPlugin {
     }
 }
 
+#[derive(SystemParam)]
+struct PointerInput<'w, 's> {
+    cursor: MessageReader<'w, 's, CursorMoved>,
+    buttons: MessageReader<'w, 's, MouseButtonInput>,
+    touches: MessageReader<'w, 's, TouchInput>,
+    wheel: MessageReader<'w, 's, MouseWheel>,
+}
+
 fn route_input(
     view: Option<NonSendMut<HudView>>,
-    mut cursor: MessageReader<CursorMoved>,
-    mut buttons: MessageReader<MouseButtonInput>,
-    mut wheel: MessageReader<MouseWheel>,
+    mut pointers: PointerInput,
     mut keys: MessageReader<KeyboardInput>,
     held: Res<ButtonInput<KeyCode>>,
     mut taken: ResMut<HudInput>,
@@ -166,14 +178,19 @@ fn route_input(
     let Some(mut view) = view else {
         return;
     };
+    for touch in pointers.touches.read() {
+        route_touch(&mut view.view, touch, &mut taken.finger);
+    }
     let shell = view.view.shell();
-    for moved in cursor.read() {
+    for moved in pointers.cursor.read() {
+        shell.set_pointer_source(PointerSource::Mouse);
         shell.set_cursor(moved.position.x, moved.position.y);
     }
-    for input in buttons.read() {
+    for input in pointers.buttons.read() {
         if input.button != MouseButton::Left {
             continue;
         }
+        shell.set_pointer_source(PointerSource::Mouse);
         match input.state {
             ButtonState::Pressed => taken.pointer = shell.pointer_pressed(),
             ButtonState::Released => {
@@ -182,7 +199,7 @@ fn route_input(
             }
         }
     }
-    for scrolled in wheel.read() {
+    for scrolled in pointers.wheel.read() {
         let scale = match scrolled.unit {
             MouseScrollUnit::Line => WHEEL_LINE,
             MouseScrollUnit::Pixel => 1.0,
@@ -206,6 +223,38 @@ fn route_input(
         if kind == KeyEventType::KeyDown {
             taken.keyboard = took;
         }
+    }
+}
+
+// A finger presses the HUD's pointer when nothing of the HUD's holds it and
+// something of the HUD's is under it. Other fingers belong to the game.
+fn route_touch(view: &mut GuestView, touch: &TouchInput, finger: &mut Option<u64>) {
+    let mine = *finger == Some(touch.id);
+    let at = touch.position;
+    let shell = view.shell();
+    shell.set_pointer_source(PointerSource::Touch);
+    match touch.phase {
+        TouchPhase::Started if finger.is_none() => {
+            shell.set_cursor(at.x, at.y);
+            if shell.pointer_pressed() {
+                *finger = Some(touch.id);
+            } else {
+                shell.pointer_released();
+            }
+        }
+        TouchPhase::Moved if mine => {
+            shell.set_cursor(at.x, at.y);
+        }
+        TouchPhase::Ended if mine => {
+            shell.set_cursor(at.x, at.y);
+            shell.pointer_released();
+            *finger = None;
+        }
+        TouchPhase::Canceled if mine => {
+            shell.cancel_gesture();
+            *finger = None;
+        }
+        _ => {}
     }
 }
 

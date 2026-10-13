@@ -4,13 +4,16 @@ use std::{cell::Cell, rc::Rc};
 
 use cranpose::{prelude::*, *};
 use cranpose_bevy::{BevyScene, rememberBevyView};
-use demo_scene::SceneControls;
+use demo_scene::{Quality, SceneControls};
 use demo_ui::{EngineInfo, EngineWindow, rememberWindowStates};
 
 const BEVY: EngineInfo = EngineInfo {
     name: "Bevy",
     description: "Bevy 0.20 renders this scene on its own thread with Cranpose's wgpu device. Cranpose shows each finished frame as an image, clips it and draws glass over it. No pixels are copied, and the interface never waits for Bevy.",
+    #[cfg(not(feature = "webgl2"))]
     features: "Earth atmosphere, cascaded shadows, fog, bloom",
+    #[cfg(feature = "webgl2")]
+    features: "Cascaded shadows, fog, bloom; WebGL2 has no atmosphere",
 };
 
 /// The launcher with Bevy's device requests.
@@ -22,11 +25,24 @@ pub fn launcher() -> AppLauncher {
         .with_developer_inspector(false)
 }
 
-/// The window: the scene controls beside Bevy's view of the valley.
+// The most pixels per dp Bevy renders on a phone; Cranpose draws its own
+// interface at the screen's full density.
+const PHONE_DENSITY: f32 = 1.5;
+
+/// The window: the scene controls beside Bevy's view of the valley. `touch`
+/// says whether the screen is a phone's touch screen: the window then shows
+/// the touch stick before the first touch, and Bevy renders the phone's
+/// quality at no more than 1.5 pixels per dp.
 #[composable]
-pub fn Root() {
-    let states = rememberWindowStates();
-    let bevy = rememberBevyView(demo_scene::build);
+pub fn Root(touch: bool) {
+    let states = rememberWindowStates(touch);
+    let quality = if touch { Quality::Phone } else { Quality::Full };
+    let bevy = rememberBevyView(move |app, target| demo_scene::build(app, target, quality));
+    if let Some(bevy) = &bevy
+        && touch
+    {
+        bevy.set_max_density(PHONE_DENSITY);
+    }
     let controls = states.controls.value();
     if let Some(bevy) = bevy.clone() {
         LaunchedEffect(controls, move |_| {
@@ -66,12 +82,13 @@ mod web {
         console_error_panic_hook::set_once();
     }
 
-    /// Runs the window in the page's `app` canvas.
+    /// Runs the window in the page's `app` canvas. `touch` says whether the
+    /// page's main pointer is a finger.
     #[wasm_bindgen]
-    pub async fn run_app() -> Result<(), JsValue> {
+    pub async fn run_app(touch: bool) -> Result<(), JsValue> {
         super::launcher()
             .with_web_fill_viewport(true)
-            .run_web("app", super::Root)
+            .run_web("app", move || super::Root(touch))
             .await
     }
 }

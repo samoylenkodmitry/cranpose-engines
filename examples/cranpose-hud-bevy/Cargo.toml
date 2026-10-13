@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 # The web build's wasm-opt pass (`scripts/build-web.sh`, profile `web`). Its
 # feature defaults lag the compiler's, so it gets the features rustc emits for
-# wasm32: bulk memory and the others every browser with WebGPU runs.
+# wasm32: bulk memory and the others every browser with WebGL2 runs.
 [package.metadata.wasm-pack.profile.custom]
 wasm-opt = [
     "-Os",
@@ -26,7 +26,11 @@ wasm-opt = [
 ]
 
 [features]
-web = ["bevy/webgpu", "dep:wasm-bindgen", "dep:console_error_panic_hook"]
+# The page has two builds: `webgpu` for browsers with WebGPU and `webgl2`
+# for the others. `scripts/build-web.sh` builds both.
+web = ["dep:wasm-bindgen", "dep:console_error_panic_hook"]
+webgpu = ["web", "bevy/webgpu"]
+webgl2 = ["web", "demo-scene/webgl2"]
 
 [dependencies]
 bevy = { workspace = true, features = ["default_app", "default_platform", "3d_bevy_render"] }

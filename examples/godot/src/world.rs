@@ -122,7 +122,8 @@ impl INode3D for DemoWorld {
         let stride = Stride {
             forward: controls.walk.forward_axis(),
             right: controls.walk.right_axis(),
-            run: controls.walk.run,
+            turn: controls.walk.turn_axis(),
+            run: controls.walk.running(),
         };
         walker.step(&terrain, stride, controls.yaw, (delta as f32).min(0.1));
         let eye = walker.eye();
