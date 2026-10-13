@@ -1,0 +1,30 @@
+[package]
+name = "bevy-game-with-cranpose-hud"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { version = "0.20", default-features = false, features = [
+    "default_app",
+    "default_platform",
+    "3d_bevy_render",
+] }
+cranpose = { version = "0.9.37", default-features = false, features = [
+    "renderer-wgpu",
+    "embedded-default-font",
+] }
+cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.0" }
+
+# Bevy requires crates.io's wgpu; this resolves it to the wgpu fork Cranpose
+# uses, so Bevy and Cranpose share one device.
+[patch.crates-io]
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.0" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[workspace]

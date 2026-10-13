@@ -1,0 +1,104 @@
+name: Release
+
+# A version tag builds the examples and attaches them to the tag's release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The templates pin this repository by tag, so a release tag must be the
+  # one they name.
+  templates:
+    name: Templates name this tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check the templates' tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          stale=$(grep -rn 'cranpose-engines", tag = ' templates --include=Cargo.toml | grep -v "tag = \"$TAG\"" || true)
+          if [ -n "$stale" ]; then
+            echo "These template dependencies do not name $TAG:"
+            echo "$stale"
+            exit 1
+          fi
+
+  bevy:
+    name: Bevy examples (${{ matrix.name }})
+    needs: templates
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-15
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+          - name: windows-x86_64
+            runner: windows-2025
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install Bevy's system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libudev-dev libasound2-dev libwayland-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked -p bevy-in-cranpose -p cranpose-hud-bevy
+      - name: Package
+        shell: bash
+        run: scripts/package-bevy.sh "${{ matrix.name }}" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bevy-${{ matrix.name }}
+          path: dist/*
+
+  godot:
+    name: Godot example (macos-arm64)
+    needs: templates
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked -p cranpose-godot-demo
+      - name: Package
+        run: scripts/package-godot.sh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-macos-arm64
+          path: dist/*
+
+  release:
+    name: Release
+    needs: [bevy, godot]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach the builds to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

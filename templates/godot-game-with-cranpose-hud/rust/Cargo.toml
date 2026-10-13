@@ -1,0 +1,24 @@
+[package]
+name = "godot-game-hud"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cranpose = { version = "0.9.37", default-features = false, features = [
+    "renderer-wgpu",
+    "embedded-default-font",
+] }
+cranpose-godot = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.0" }
+godot = { version = "0.5.5", features = ["api-4-7"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[workspace]

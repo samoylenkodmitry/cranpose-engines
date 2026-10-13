@@ -1,0 +1,4 @@
+# Godot rebuilds this folder; the extension list lets the project load its
+# Rust extension without an import first.
+.godot/*
+!.godot/extension_list.cfg

@@ -1,0 +1,67 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    name: macOS
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: |
+          cargo fmt --all --check
+          find templates -name '*.rs' -not -path '*/target/*' -print0 \
+            | xargs -0 rustfmt --edition 2024 --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Templates
+        run: scripts/check-templates.py
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install Bevy's system libraries and a software Vulkan driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libudev-dev libasound2-dev libwayland-dev libxkbcommon-dev \
+            mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # The Godot bridge imports Godot's Metal objects, so its demo builds on
+      # macOS only.
+      - name: Clippy
+        run: cargo clippy --workspace --exclude cranpose-godot-demo --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --workspace --exclude cranpose-godot-demo --locked
+      - name: Templates
+        run: scripts/check-templates.py
+      - name: Web examples
+        run: |
+          cargo clippy --locked --target wasm32-unknown-unknown -p bevy-in-cranpose --no-default-features --features web -- -D warnings
+          cargo clippy --locked --target wasm32-unknown-unknown -p cranpose-hud-bevy --features web -- -D warnings

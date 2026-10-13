@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{TITLE}}</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0c0e16; overscroll-behavior: none; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; outline: none; }
+    #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 24px; background: #0c0e16; color: #e6e9ef; font: 400 0.95rem/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #boot .spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid rgba(230, 233, 239, 0.18); border-top-color: #8e7cff; animation: spin 0.9s linear infinite; }
+    #boot.error .detail { color: #ffb4b4; max-width: 34rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="boot">
+    <div class="spinner"></div>
+    <div class="detail">Loading {{TITLE}}&hellip;</div>
+  </div>
+  <script type="module">
+    const boot = document.getElementById("boot");
+
+    function fail(message) {
+      boot.classList.add("error");
+      boot.querySelector(".spinner")?.remove();
+      boot.querySelector(".detail").textContent = message;
+    }
+
+    async function main() {
+      if (!("gpu" in navigator) || !(await navigator.gpu.requestAdapter())) {
+        throw new Error("This example needs WebGPU: Bevy's atmosphere runs compute shaders. Open it in Chrome, Edge or Safari 26.");
+      }
+      const wasm = await import("./pkg/{{PACKAGE}}.js");
+      await wasm.default();
+      boot.remove();
+      await wasm.run_app();
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      fail(String(error && error.message ? error.message : error));
+    });
+  </script>
+</body>
+</html>

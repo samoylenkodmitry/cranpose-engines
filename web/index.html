@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cranpose with game engines</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0c0e16; color: #e6e9ef; font: 400 1rem/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    main { max-width: 52rem; margin: 0 auto; padding: 48px 20px; }
+    h1 { font-size: 1.8rem; margin: 0 0 8px; }
+    p { color: #c8cedc; }
+    a { color: #a99bff; }
+    .examples { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); margin-top: 28px; }
+    .example { display: block; background: #161a26; border-radius: 16px; overflow: hidden; text-decoration: none; color: inherit; }
+    .example img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+    .example div { padding: 14px 16px 18px; }
+    .example strong { display: block; color: #fff; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cranpose with game engines</h1>
+    <p>Cranpose and Bevy render with one WebGPU device in your browser: Bevy's valley inside a Cranpose layout, and a Cranpose HUD over Bevy's camera. The examples need WebGPU (Chrome, Edge, Safari 26).</p>
+    <div class="examples">
+      <a class="example" href="bevy-in-cranpose/">
+        <img src="screenshots/bevy-in-cranpose.jpg" alt="Bevy's valley inside a Cranpose window" />
+        <div><strong>Bevy inside Cranpose</strong>Cranpose's controls and glass around Bevy's 3D scene.</div>
+      </a>
+      <a class="example" href="cranpose-hud-bevy/">
+        <img src="screenshots/cranpose-hud-bevy.jpg" alt="A Cranpose HUD over Bevy's valley" />
+        <div><strong>Cranpose HUD in Bevy</strong>A Cranpose interface over a Bevy game.</div>
+      </a>
+    </div>
+    <p>Walk with WASD or the arrow keys, run with Shift, and drag to look. Source, desktop downloads and project templates: <a href="https://github.com/samoylenkodmitry/cranpose-engines">github.com/samoylenkodmitry/cranpose-engines</a>.</p>
+  </main>
+</body>
+</html>

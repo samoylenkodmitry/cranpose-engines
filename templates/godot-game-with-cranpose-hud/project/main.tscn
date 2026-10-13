@@ -1,0 +1,42 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_cube"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cube"]
+albedo_color = Color(0.95, 0.45, 0.25, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_floor"]
+size = Vector2(60, 60)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.32, 0.36, 0.42, 1)
+
+[sub_resource type="Environment" id="Environment_scene"]
+background_mode = 1
+background_color = Color(0.05, 0.06, 0.09, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.5, 0.55, 0.65, 1)
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_scene")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.848, 0.1797, -0.4986, 0, 0.9408, 0.3391, 0.53, -0.2875, 0.7978, -2.5, 2.2, 4)
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.5547, -0.7132, 0.4286, 0, 0.5151, 0.8571, -0.8321, -0.4755, 0.2857, 3, 6, 2)
+shadow_enabled = true
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_floor")
+surface_material_override/0 = SubResource("StandardMaterial3D_floor")
+
+[node name="Cube" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("BoxMesh_cube")
+surface_material_override/0 = SubResource("StandardMaterial3D_cube")
+
+[node name="CranposeHud" type="CranposeHud" parent="." node_paths=PackedStringArray("target")]
+target = NodePath("../Cube")

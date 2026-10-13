@@ -1,0 +1,46 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "examples/*"]
+exclude = ["templates"]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/samoylenkodmitry/cranpose-engines"
+publish = false
+
+[workspace.dependencies]
+bevy = { version = "0.20", default-features = false }
+cranpose = { version = "0.9.37", default-features = false }
+cranpose-bevy = { path = "crates/cranpose-bevy" }
+cranpose-godot = { path = "crates/cranpose-godot" }
+cranpose-gpu-interop = { path = "crates/cranpose-gpu-interop" }
+demo-scene = { path = "examples/demo-scene" }
+demo-ui = { path = "examples/demo-ui" }
+godot = { version = "0.5.5", features = ["api-4-7"] }
+nature = { path = "examples/nature" }
+wgpu = { version = "30", default-features = false }
+
+# Bevy requires crates.io's wgpu; this resolves it to Cranpose's wgpu fork, so
+# Bevy and Cranpose share one wgpu crate and one device.
+[patch.crates-io]
+wgpu = { path = "wgpu-shim" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# The downloads: no symbols, and thin link-time optimisation for size.
+[profile.release]
+strip = true
+lto = "thin"
+
+# The web bundles: small first, since a page downloads all of it.
+[profile.web]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"

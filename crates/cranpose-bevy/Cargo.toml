@@ -1,0 +1,26 @@
+[package]
+name = "cranpose-bevy"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Bevy and Cranpose on one wgpu device: Bevy scenes inside Cranpose layouts, Cranpose HUDs over Bevy scenes"
+
+[features]
+# For a build that also turns on Bevy's `bevy_winit`, such as one with a Bevy
+# game window: BevyView then leaves Bevy's window plugin out.
+bevy_winit = ["bevy/bevy_winit"]
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "default_app",
+    "3d_bevy_render",
+    "multi_threaded",
+    "std",
+] }
+cranpose = { workspace = true, features = ["renderer-wgpu"] }
+wgpu = { workspace = true }
+
+[dev-dependencies]
+cranpose = { workspace = true, features = ["renderer-wgpu"] }

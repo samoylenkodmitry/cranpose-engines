@@ -1,0 +1,4 @@
+/target
+/dist
+# Local only: builds against an unreleased Cranpose checkout.
+/.cargo/config.toml
