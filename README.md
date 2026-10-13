@@ -72,12 +72,12 @@ The crates come from this repository by git tag:
 
 ```toml
 [dependencies]
-cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.0" }
+cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.1" }
 
 # Bevy requires crates.io's wgpu; this resolves it to the wgpu fork Cranpose
 # uses, so Bevy and Cranpose share one device.
 [patch.crates-io]
-wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.0" }
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.1" }
 ```
 
 - **A Bevy scene in a Cranpose app.** Ask the window's device for Bevy's
