@@ -246,20 +246,15 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
             );
         })
     });
-    // The newest image read back, a frame or more after `app.update`.
-    let top = |app: &mut App| {
-        for _ in 0..60 {
+    // Read back images arrive frames late, and later on a software GPU.
+    let mut shows = |app: &mut App, color: [u8; 4]| {
+        (0..600).any(|_| {
             app.update();
-            if let Some(pixels) = read.lock().expect("readback").take() {
-                return pixel(&pixels, 8, 4);
-            }
-        }
-        panic!("no readback");
+            let pixels = read.lock().expect("readback").take();
+            pixels.is_some_and(|pixels| pixel(&pixels, 8, 4) == color)
+        })
     };
-    assert!(
-        (0..30).any(|_| top(&mut app) == RED),
-        "the panel shows first"
-    );
+    assert!(shows(&mut app, RED), "the panel shows first");
     for phase in [TouchPhase::Started, TouchPhase::Ended] {
         app.world_mut().write_message(TouchInput {
             phase,
@@ -269,11 +264,11 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
             id: 7,
         });
     }
-    let hidden = (0..120).position(|_| top(&mut app) == BLUE);
+    let hidden = shows(&mut app, BLUE);
     let clicks = *clicks.lock().expect("clicks");
     assert!(
-        hidden.is_some(),
-        "the panel stayed for 120 frames after {clicks} click(s)"
+        hidden,
+        "the panel stayed for 600 frames after {clicks} click(s)"
     );
     assert_eq!(clicks, 1);
 }
