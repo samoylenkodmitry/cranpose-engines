@@ -247,7 +247,7 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
         })
     });
     // Read back images arrive frames late, and later on a software GPU.
-    let mut shows = |app: &mut App, color: [u8; 4]| {
+    let shows = |app: &mut App, color: [u8; 4]| {
         (0..600).any(|_| {
             app.update();
             let pixels = read.lock().expect("readback").take();
