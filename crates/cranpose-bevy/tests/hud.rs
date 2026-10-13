@@ -208,9 +208,13 @@ fn a_finger_on_the_hud_stays_the_huds_and_other_fingers_stay_the_games() {
 
 #[test]
 fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
-    let (mut app, read) = hud_app(|_| {
-        Box::new(|| {
+    let clicks: Arc<Mutex<u32>> = Arc::default();
+    let sink = Arc::clone(&clicks);
+    let (mut app, read) = hud_app(move |_| {
+        let sink = Arc::clone(&sink);
+        Box::new(move || {
             let shown = rememberMutableStateOf(|| true);
+            let sink = Arc::clone(&sink);
             Column(
                 Modifier::empty().fill_max_size(),
                 ColumnSpec::default(),
@@ -225,10 +229,16 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
                         );
                     }
                     Spacer(Modifier::empty().weight(1.0));
+                    let sink = Arc::clone(&sink);
                     Box(
                         Modifier::empty()
                             .size(Size::new(WIDTH as f32, 16.0))
-                            .clickable(move |_| shown.set(!shown.value())),
+                            .clickable(move |_| {
+                                if let Ok(mut clicks) = sink.lock() {
+                                    *clicks += 1;
+                                }
+                                shown.set(!shown.value());
+                            }),
                         BoxSpec::default(),
                         || {},
                     );
@@ -236,6 +246,7 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
             );
         })
     });
+    // The newest image read back, a frame or more after `app.update`.
     let top = |app: &mut App| {
         for _ in 0..60 {
             app.update();
@@ -245,14 +256,10 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
         }
         panic!("no readback");
     };
-    let mut seen = top(&mut app);
-    for _ in 0..30 {
-        if seen == RED {
-            break;
-        }
-        seen = top(&mut app);
-    }
-    assert_eq!(seen, RED, "the panel shows first");
+    assert!(
+        (0..30).any(|_| top(&mut app) == RED),
+        "the panel shows first"
+    );
     for phase in [TouchPhase::Started, TouchPhase::Ended] {
         app.world_mut().write_message(TouchInput {
             phase,
@@ -262,9 +269,11 @@ fn a_tap_that_hides_a_panel_shows_the_hud_without_it() {
             id: 7,
         });
     }
-    let mut after = Vec::new();
-    for _ in 0..10 {
-        after.push(top(&mut app));
-    }
-    assert!(after.iter().skip(3).all(|seen| *seen == BLUE), "{after:?}");
+    let hidden = (0..120).position(|_| top(&mut app) == BLUE);
+    let clicks = *clicks.lock().expect("clicks");
+    assert!(
+        hidden.is_some(),
+        "the panel stayed for 120 frames after {clicks} click(s)"
+    );
+    assert_eq!(clicks, 1);
 }
