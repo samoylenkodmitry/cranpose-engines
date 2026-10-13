@@ -10,6 +10,21 @@ description = "A Bevy game with a Cranpose HUD drawn on Bevy's wgpu device"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+
+# The web build's wasm-opt pass (`scripts/build-web.sh`, profile `web`). Its
+# feature defaults lag the compiler's, so it gets the features rustc emits for
+# wasm32: bulk memory and the others every browser with WebGPU runs.
+[package.metadata.wasm-pack.profile.custom]
+wasm-opt = [
+    "-Os",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-reference-types",
+    "--enable-multivalue",
+]
+
 [features]
 web = ["bevy/webgpu", "dep:wasm-bindgen", "dep:console_error_panic_hook"]
 

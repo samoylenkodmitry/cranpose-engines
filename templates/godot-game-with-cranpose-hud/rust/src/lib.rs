@@ -2,6 +2,9 @@
 //! over the scene and turns the node its `target` names at the speed the HUD
 //! sets. `hud.rs` is the HUD.
 
+// godot-rust's `GodotClass` derive writes `base: base`.
+#![allow(clippy::redundant_field_names)]
+
 mod hud;
 
 use std::f64::consts::TAU;

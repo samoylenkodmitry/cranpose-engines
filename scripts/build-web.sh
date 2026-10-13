@@ -8,6 +8,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$root/dist/web}"
 mkdir -p "$out/screenshots"
+# wasm-pack reads --out-dir from each crate's folder, so the path must be
+# absolute.
+out="$(cd "$out" && pwd)"
 cp "$root/web/index.html" "$out/index.html"
 cp "$root/screenshots/"*.jpg "$out/screenshots/"
 
