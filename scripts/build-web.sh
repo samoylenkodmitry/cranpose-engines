@@ -3,7 +3,8 @@
 #   <out>/index.html, <out>/<example>/index.html, <out>/<example>/pkg/ for
 #   browsers with WebGPU and <out>/<example>/pkg-webgl2/ for the others.
 #
-#   scripts/build-web.sh [out]        # default out: dist/web
+#   scripts/build-web.sh [out]                          # every package
+#   scripts/build-web.sh out bevy-in-cranpose webgl2    # one package
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,20 +16,31 @@ out="$(cd "$out" && pwd)"
 cp "$root/web/index.html" "$out/index.html"
 cp "$root/screenshots/"*.jpg "$out/screenshots/"
 
+title() {
+  case "$1" in
+    bevy-in-cranpose) echo "Bevy inside Cranpose" ;;
+    cranpose-hud-bevy) echo "Cranpose HUD in Bevy" ;;
+    *) echo "unknown example $1" >&2; exit 1 ;;
+  esac
+}
+
 build() {
-  local crate="$1" title="$2"
-  local package="${crate//-/_}"
-  local build pkg
-  for build in webgpu webgl2; do
-    pkg="$out/$crate/pkg"
-    [ "$build" = webgpu ] || pkg="$pkg-$build"
-    wasm-pack build "$root/examples/$crate" --target web --profile web \
-      --out-dir "$pkg" --no-default-features --features "$build"
-    rm -f "$pkg/.gitignore" "$pkg/package.json" "$pkg/README.md"
-  done
-  sed -e "s/{{TITLE}}/$title/g" -e "s/{{PACKAGE}}/$package/g" \
+  local crate="$1" build="$2"
+  local package="${crate//-/_}" pkg="$out/$crate/pkg"
+  [ "$build" = webgpu ] || pkg="$pkg-$build"
+  wasm-pack build "$root/examples/$crate" --target web --profile web \
+    --out-dir "$pkg" --no-default-features --features "$build"
+  rm -f "$pkg/.gitignore" "$pkg/package.json" "$pkg/README.md"
+  sed -e "s/{{TITLE}}/$(title "$crate")/g" -e "s/{{PACKAGE}}/$package/g" \
     "$root/web/example.html" > "$out/$crate/index.html"
 }
 
-build bevy-in-cranpose "Bevy inside Cranpose"
-build cranpose-hud-bevy "Cranpose HUD in Bevy"
+if [ $# -ge 3 ]; then
+  build "$2" "$3"
+else
+  for crate in bevy-in-cranpose cranpose-hud-bevy; do
+    for build in webgpu webgl2; do
+      build "$crate" "$build"
+    done
+  done
+fi
