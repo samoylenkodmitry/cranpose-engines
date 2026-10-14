@@ -43,7 +43,7 @@ build() {
 
 # The Godot demo extension as an Emscripten side module, where the
 # project's .gdextension expects it, then Godot's web export of the project.
-godot() {
+godot_export() {
   local target="${CARGO_TARGET_DIR:-$root/target}"
   local library="wasm32-unknown-emscripten/web/cranpose_godot_demo.wasm"
   (cd "$root" && scripts/emscripten-cargo.sh build --profile web -p cranpose-godot-demo)
@@ -60,12 +60,12 @@ godot() {
 if [ $# -ge 3 ]; then
   build "$2" "$3"
 elif [ "${2:-}" = godot ]; then
-  godot
+  godot_export
 else
   for crate in bevy-in-cranpose cranpose-hud-bevy; do
     for build in webgpu webgl2; do
       build "$crate" "$build"
     done
   done
-  godot
+  godot_export
 fi
