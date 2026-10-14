@@ -5,10 +5,15 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "Cranpose in Godot 4: a composition drawn over Godot's frame on Godot's Metal device, with Godot's input"
+description = "Cranpose in Godot 4: a composition drawn over Godot's frame on Godot's own GPU device, Metal on macOS and WebGL2 on the web, with Godot's input"
 
 [dependencies]
 cranpose = { workspace = true, features = ["renderer-wgpu", "embedded-default-font"] }
 cranpose-gpu-interop = { workspace = true, features = ["godot"] }
 godot = { workspace = true }
-wgpu = { package = "cranpose-wgpu", version = "30.0.16", default-features = false }
+wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }
+
+# Godot's web export loads the extension as a single-threaded Emscripten
+# module.
+[target.'cfg(target_os = "emscripten")'.dependencies]
+godot = { workspace = true, features = ["experimental-wasm", "experimental-wasm-nothreads", "lazy-function-tables"] }

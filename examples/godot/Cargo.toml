@@ -16,4 +16,4 @@ cranpose-godot = { workspace = true }
 demo-ui = { workspace = true }
 godot = { workspace = true }
 nature = { workspace = true }
-wgpu = { package = "cranpose-wgpu", version = "30.0.16", default-features = false }
+wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }

@@ -53,8 +53,8 @@ jobs:
           components: clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      # The Godot bridge imports Godot's Metal objects, so its demo builds on
-      # macOS only.
+      # The Godot bridge imports Godot's Metal objects on macOS and shares
+      # Godot's WebGL2 context on the web, so its demo builds on those only.
       - name: Clippy
         run: cargo clippy --workspace --exclude cranpose-godot-demo --all-targets --locked -- -D warnings
       - name: Test
@@ -67,3 +67,18 @@ jobs:
             cargo clippy --locked --target wasm32-unknown-unknown -p bevy-in-cranpose --no-default-features --features $build -- -D warnings
             cargo clippy --locked --target wasm32-unknown-unknown -p cranpose-hud-bevy --features $build -- -D warnings
           done
+
+  godot-web:
+    name: Godot web
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-03
+          components: clippy, rust-src
+      - uses: Swatinem/rust-cache@v2
+      # Godot's web export loads the extension as an Emscripten side module;
+      # the code that shares Godot's WebGL2 context compiles for it only.
+      - name: Clippy
+        run: scripts/emscripten-cargo.sh clippy --locked -p cranpose-godot-demo -- -D warnings

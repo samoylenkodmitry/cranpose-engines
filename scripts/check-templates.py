@@ -63,6 +63,7 @@ def cargo_command(mode: str) -> list[str]:
         for name, path in (
             ("cranpose", "crates/cranpose"),
             ("cranpose-wgpu", "forks/wgpu/wgpu"),
+            ("cranpose-wgpu-hal", "forks/wgpu/wgpu-hal"),
         ):
             command += ["--config", f'patch.crates-io.{name}.path="{Path(cranpose) / path}"']
     return command + tail

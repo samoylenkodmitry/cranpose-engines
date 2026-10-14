@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-cranpose = { version = "0.9.41", default-features = false, features = [
+cranpose = { version = "0.11.0", default-features = false, features = [
     "renderer-wgpu",
     "embedded-default-font",
 ] }

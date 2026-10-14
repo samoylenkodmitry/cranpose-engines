@@ -7,6 +7,12 @@
 
 #![allow(unsafe_code)]
 
+#[cfg(feature = "godot")]
+mod extension;
+#[cfg(target_os = "emscripten")]
+pub mod gl;
+#[cfg(target_os = "emscripten")]
+mod gl_names;
 #[cfg(all(feature = "godot", target_vendor = "apple"))]
 pub mod godot;
 #[cfg(target_vendor = "apple")]

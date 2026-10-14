@@ -21,7 +21,7 @@
 <body>
   <main>
     <h1>Cranpose with game engines</h1>
-    <p>Cranpose and Bevy render with one GPU device in your browser: Bevy's valley inside a Cranpose layout, and a Cranpose HUD over Bevy's camera. They run on WebGPU where the browser has it (Chrome, Edge, Safari 26) and on WebGL2 elsewhere, with a plain sky in place of the atmosphere.</p>
+    <p>Cranpose renders with Bevy and with Godot on one GPU device in your browser: each engine's valley inside a Cranpose layout, and a Cranpose HUD over each engine's camera. The Bevy examples run on WebGPU where the browser has it (Chrome, Edge, Safari 26) and on WebGL2 elsewhere, with a plain sky in place of the atmosphere. Godot's web export runs on WebGL2, and Cranpose runs inside it as a Godot extension on Godot's own WebGL2 context.</p>
     <div class="examples">
       <a class="example" href="bevy-in-cranpose/">
         <img src="screenshots/bevy-in-cranpose.jpg" alt="Bevy's valley inside a Cranpose window" />
@@ -30,6 +30,14 @@
       <a class="example" href="cranpose-hud-bevy/">
         <img src="screenshots/cranpose-hud-bevy.jpg" alt="A Cranpose HUD over Bevy's valley" />
         <div><strong>Cranpose HUD in Bevy</strong>A Cranpose interface over a Bevy game.</div>
+      </a>
+      <a class="example" href="godot/?scene=window">
+        <img src="screenshots/godot-in-cranpose.jpg" alt="Godot's valley inside a Cranpose window" />
+        <div><strong>Godot inside Cranpose</strong>Cranpose's controls and glass around Godot's 3D scene.</div>
+      </a>
+      <a class="example" href="godot/">
+        <img src="screenshots/cranpose-hud-godot.jpg" alt="A Cranpose HUD over Godot's valley" />
+        <div><strong>Cranpose HUD in Godot</strong>A Cranpose interface over a Godot game.</div>
       </a>
     </div>
     <p>Walk with WASD or the arrow keys, run with Shift, and drag to look. On a phone, drag to look and use the stick to walk and turn. Source, desktop downloads and project templates: <a href="https://github.com/samoylenkodmitry/cranpose-engines">github.com/samoylenkodmitry/cranpose-engines</a>.</p>

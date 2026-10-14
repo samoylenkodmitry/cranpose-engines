@@ -5,6 +5,12 @@
 #
 #   scripts/build-web.sh [out]                          # every package
 #   scripts/build-web.sh out bevy-in-cranpose webgl2    # one package
+#   scripts/build-web.sh out godot                      # the Godot export
+#
+# The Godot export, <out>/godot/, needs Emscripten 4.0.20 (`emcc` on PATH),
+# the Rust toolchain of scripts/emscripten-cargo.sh with rust-src, Godot 4.7.2
+# as $GODOT (default `godot`) and its web templates
+# (scripts/godot-web-templates.py 4.7.2).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,12 +41,31 @@ build() {
     "$root/web/example.html" > "$out/$crate/index.html"
 }
 
+# The Godot demo extension as an Emscripten side module, where the
+# project's .gdextension expects it, then Godot's web export of the project.
+godot_export() {
+  local target="${CARGO_TARGET_DIR:-$root/target}"
+  local library="wasm32-unknown-emscripten/web/cranpose_godot_demo.wasm"
+  (cd "$root" && scripts/emscripten-cargo.sh build --profile web -p cranpose-godot-demo)
+  if [ "$target" != "$root/target" ]; then
+    mkdir -p "$(dirname "$root/target/$library")"
+    cp "$target/$library" "$root/target/$library"
+  fi
+  mkdir -p "$out/godot"
+  local project="$root/examples/godot/project"
+  "${GODOT:-godot}" --headless --path "$project" --import
+  "${GODOT:-godot}" --headless --path "$project" --export-release Web "$out/godot/index.html"
+}
+
 if [ $# -ge 3 ]; then
   build "$2" "$3"
+elif [ "${2:-}" = godot ]; then
+  godot_export
 else
   for crate in bevy-in-cranpose cranpose-hud-bevy; do
     for build in webgpu webgl2; do
       build "$crate" "$build"
     done
   done
+  godot_export
 fi

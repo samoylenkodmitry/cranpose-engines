@@ -1,4 +1,4 @@
-use demo_ui::Controls;
+use demo_ui::{Controls, SceneCommand, ScenePointer};
 use godot::{
     classes::{
         ArrayMesh, Camera3D, DirectionalLight3D, Environment, INode3D, MeshInstance3D, MultiMesh,
@@ -14,6 +14,8 @@ use godot::{
     prelude::*,
 };
 use nature::{MeshData, Stride, Terrain, Valley, Walker};
+
+use crate::office::OfficeNodes;
 
 const SEED: u32 = 7;
 
@@ -51,6 +53,8 @@ pub struct DemoWorld {
     camera: Option<Gd<Camera3D>>,
     sun: Option<Gd<DirectionalLight3D>>,
     environment: Option<Gd<Environment>>,
+    office: Option<OfficeNodes>,
+    seconds: f32,
 }
 
 #[godot_api]
@@ -105,6 +109,8 @@ impl INode3D for DemoWorld {
             }
             self.base_mut().add_child(&instance);
         }
+        let office = OfficeNodes::place(&terrain, |node| self.base_mut().add_child(&node));
+        self.office = office;
         self.walker = Some(Walker::start(&terrain));
         self.terrain = Some(terrain);
         self.apply_controls();
@@ -128,11 +134,13 @@ impl INode3D for DemoWorld {
         walker.step(&terrain, stride, controls.yaw, (delta as f32).min(0.1));
         let eye = walker.eye();
         let target = walker.look_at(controls.yaw, controls.pitch);
+        let eye = Vector3::new(eye[0], eye[1], eye[2]);
         if let Some(camera) = self.camera.as_mut() {
-            camera.look_at_from_position(
-                Vector3::new(eye[0], eye[1], eye[2]),
-                Vector3::new(target[0], target[1], target[2]),
-            );
+            camera.look_at_from_position(eye, Vector3::new(target[0], target[1], target[2]));
+        }
+        self.seconds += delta as f32;
+        if let Some(office) = self.office.as_mut() {
+            office.update(self.seconds, eye, &controls);
         }
     }
 }
@@ -150,6 +158,23 @@ impl DemoWorld {
         self.controls = controls;
         if sky_changed {
             self.apply_controls();
+        }
+    }
+
+    /// Hands the office's screen a pointer sample in the camera's viewport
+    /// pixels and returns whether the screen holds the press after it.
+    pub fn office_pointer(&mut self, sample: ScenePointer) -> bool {
+        match (self.office.as_mut(), self.camera.as_ref()) {
+            (Some(office), Some(camera)) => office.pointer(camera, sample),
+            _ => false,
+        }
+    }
+
+    /// Hands `apply` the commands the office's terminal sent since the last
+    /// call.
+    pub fn drain_office_commands(&self, apply: impl FnMut(SceneCommand)) {
+        if let Some(office) = self.office.as_ref() {
+            office.drain_commands(apply);
         }
     }
 

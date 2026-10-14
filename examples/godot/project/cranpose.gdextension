@@ -6,3 +6,5 @@ reloadable = false
 [libraries]
 macos.debug = "res://../../../target/debug/libcranpose_godot_demo.dylib"
 macos.release = "res://../../../target/release/libcranpose_godot_demo.dylib"
+web.debug.wasm32 = "res://../../../target/wasm32-unknown-emscripten/web/cranpose_godot_demo.wasm"
+web.release.wasm32 = "res://../../../target/wasm32-unknown-emscripten/web/cranpose_godot_demo.wasm"

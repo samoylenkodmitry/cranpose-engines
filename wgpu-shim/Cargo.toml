@@ -1,6 +1,6 @@
 [package]
 name = "wgpu"
-version = "30.0.16"
+version = "30.0.20"
 edition = "2024"
 publish = false
 repository = "https://github.com/samoylenkodmitry/cranpose-engines"
@@ -8,7 +8,7 @@ description = "Bevy's wgpu resolved to Cranpose's wgpu fork, so both share one d
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-fork = { package = "cranpose-wgpu", version = "30.0.16", default-features = false }
+fork = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }
 
 [features]
 default = ["fork/default"]

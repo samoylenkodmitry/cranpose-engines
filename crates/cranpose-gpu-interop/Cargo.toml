@@ -12,14 +12,23 @@ godot = ["dep:godot"]
 
 [dependencies]
 cranpose = { workspace = true, features = ["renderer-wgpu"] }
-godot = { workspace = true, optional = true }
 pollster = "0.4"
 thiserror = "2"
 # Cranpose's wgpu fork by its own name, so a project that uses this crate
 # needs no patch of crates.io's wgpu.
-wgpu = { package = "cranpose-wgpu", version = "30.0.16", default-features = false, features = ["metal", "std", "wgsl"] }
+wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false, features = ["metal", "std", "wgsl"] }
+
+# A web export's module, such as Godot's, draws with the GL context its host
+# made current.
+[target.'cfg(target_os = "emscripten")'.dependencies]
+glow = "0.18"
+wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false, features = ["gles", "fragile-send-sync-non-atomic-wasm"] }
+wgpu-hal = { package = "cranpose-wgpu-hal", version = "30.0.15", features = ["gles"] }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
+# Godot's Metal device, for `godot`. On the web, Godot shares its WebGL2
+# context through `gl`, which needs no Godot API.
+godot = { workspace = true, optional = true }
 objc2 = "0.6.3"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSError"] }
 objc2-metal = { version = "0.3.2", default-features = false, features = [

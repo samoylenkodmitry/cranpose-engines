@@ -1,9 +1,10 @@
-use demo_ui::{HudBridge, Stats, Walk};
+use demo_ui::{HudBridge, ScenePointer, Stats, Walk};
 use godot::{
     classes::{
-        CanvasLayer, DisplayServer, Engine, INode, Input, InputEvent, InputEventMouseMotion, Node,
+        CanvasLayer, DisplayServer, Engine, INode, Input, InputEvent, InputEventMouseButton,
+        InputEventMouseMotion, Node,
     },
-    global::{Key, MouseButtonMask},
+    global::{Key, MouseButton, MouseButtonMask},
     prelude::*,
 };
 
@@ -25,12 +26,18 @@ pub struct CranposeHudDemo {
 #[godot_api]
 impl INode for CranposeHudDemo {
     fn ready(&mut self) {
+        let scale = crate::scene_scale();
+        if let Some(mut viewport) = self.base().get_viewport() {
+            viewport.set_scaling_3d_scale(scale);
+        }
         let world = DemoWorld::new_alloc();
         self.base_mut().add_child(&world);
         self.world = Some(world);
         let mut layer = CanvasLayer::new_alloc();
         self.base_mut().add_child(&layer);
-        let bridge = HudBridge::new("Godot", false);
+        // The web page passes `touch` when its main pointer is a finger; the
+        // HUD then shows its stick before the first touch.
+        let bridge = HudBridge::new("Godot", crate::user_arg("touch"));
         let content = bridge.clone();
         match Surface::new(&mut layer, true, move || demo_ui::Hud(content.clone())) {
             Ok(surface) => self.surface = Some(surface),
@@ -53,6 +60,9 @@ impl INode for CranposeHudDemo {
             for command in bridge.commands.borrow_mut().drain(..) {
                 states.controls.update(|controls| command.apply(controls));
             }
+            world.bind().drain_office_commands(|command| {
+                states.controls.update(|controls| command.apply(controls))
+            });
             let walk = Walk {
                 stick: states.controls.value().walk.stick,
                 ..held_walk()
@@ -87,7 +97,14 @@ impl INode for CranposeHudDemo {
             .surface
             .as_mut()
             .is_some_and(|surface| surface.input(&event));
-        if took {
+        // A press the HUD left may land on the office's screen, which then
+        // keeps the pointer until the release.
+        let on_screen = scene_pointer(&event).is_some_and(|sample| {
+            self.world
+                .as_mut()
+                .is_some_and(|world| world.bind_mut().office_pointer(sample))
+        });
+        if took || on_screen {
             if let Some(mut viewport) = self.base().get_viewport() {
                 viewport.set_input_as_handled();
             }
@@ -111,6 +128,24 @@ impl INode for CranposeHudDemo {
             .controls
             .update(|controls| controls.look(delta.x, delta.y));
     }
+}
+
+// The left button's presses and the pointer's moves, in the window's pixels.
+fn scene_pointer(event: &Gd<InputEvent>) -> Option<ScenePointer> {
+    if let Ok(motion) = event.clone().try_cast::<InputEventMouseMotion>() {
+        let at = motion.get_position();
+        return Some(ScenePointer::Moved([at.x, at.y]));
+    }
+    let button = event.clone().try_cast::<InputEventMouseButton>().ok()?;
+    if button.get_button_index() != MouseButton::LEFT {
+        return None;
+    }
+    let at = [button.get_position().x, button.get_position().y];
+    Some(if button.is_pressed() {
+        ScenePointer::Pressed(at)
+    } else {
+        ScenePointer::Released(at)
+    })
 }
 
 fn held_walk() -> Walk {

@@ -1,5 +1,6 @@
 mod mesh;
 mod noise;
+pub mod office;
 mod plants;
 mod terrain;
 mod valley;
