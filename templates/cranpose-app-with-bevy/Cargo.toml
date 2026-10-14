@@ -18,11 +18,6 @@ cranpose = { version = "0.11.0", default-features = false, features = [
 ] }
 cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.6" }
 
-# Bevy requires crates.io's wgpu; this resolves it to the wgpu fork Cranpose
-# uses, so Bevy and Cranpose share one device.
-[patch.crates-io]
-wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.6" }
-
 [profile.dev]
 opt-level = 1
 

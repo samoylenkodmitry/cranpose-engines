@@ -14,8 +14,13 @@ godot = ["dep:godot"]
 cranpose = { workspace = true, features = ["renderer-wgpu"] }
 pollster = "0.4"
 thiserror = "2"
-# Cranpose's wgpu fork by its own name, so a project that uses this crate
-# needs no patch of crates.io's wgpu.
+
+# Cranpose's wgpu on each target: crates.io's on desktop and Cranpose's fork
+# on the web, Android and iOS.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+wgpu = { workspace = true, features = ["metal", "std", "wgsl"] }
+
+[target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
 wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false, features = ["metal", "std", "wgsl"] }
 
 # A web export's module, such as Godot's, draws with the GL context its host

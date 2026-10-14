@@ -25,7 +25,6 @@ REPOSITORY = "https://github.com/samoylenkodmitry/cranpose-engines"
 LOCAL = {
     "cranpose-bevy": ROOT / "crates" / "cranpose-bevy",
     "cranpose-godot": ROOT / "crates" / "cranpose-godot",
-    "wgpu": ROOT / "wgpu-shim",
 }
 GIT_DEPENDENCY = re.compile(
     r'^(?P<name>[\w-]+) = \{ git = "' + re.escape(REPOSITORY) + r'", tag = "[^"]+" \}$',

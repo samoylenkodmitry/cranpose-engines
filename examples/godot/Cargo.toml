@@ -16,4 +16,11 @@ cranpose-godot = { workspace = true }
 demo-ui = { workspace = true }
 godot = { workspace = true }
 nature = { workspace = true }
+
+# Cranpose's wgpu on each target: crates.io's on desktop and Cranpose's fork
+# on the web, Android and iOS.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+wgpu = { workspace = true }
+
+[target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
 wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }

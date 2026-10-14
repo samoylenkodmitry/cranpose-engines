@@ -11,6 +11,13 @@ description = "Cranpose in Godot 4: a composition drawn over Godot's frame on Go
 cranpose = { workspace = true, features = ["renderer-wgpu", "embedded-default-font"] }
 cranpose-gpu-interop = { workspace = true, features = ["godot"] }
 godot = { workspace = true }
+
+# Cranpose's wgpu on each target: crates.io's on desktop and Cranpose's fork
+# on the web, Android and iOS.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+wgpu = { workspace = true }
+
+[target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
 wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }
 
 # Godot's web export loads the extension as a single-threaded Emscripten
