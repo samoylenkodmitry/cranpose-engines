@@ -85,12 +85,16 @@ The crates come from this repository by git tag:
 
 ```toml
 [dependencies]
-cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.1" }
+cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.7" }
+```
 
-# Bevy requires crates.io's wgpu; this resolves it to the wgpu fork Cranpose
-# uses, so Bevy and Cranpose share one device.
+On macOS, Windows and Linux that is all: Cranpose takes crates.io's wgpu
+there, the one Bevy builds against. A web build of a Bevy project also
+resolves crates.io's wgpu to the fork Cranpose uses in browsers:
+
+```toml
 [patch.crates-io]
-wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.1" }
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.7" }
 ```
 
 - **A Bevy scene in a Cranpose app.** Ask the window's device for Bevy's
@@ -174,12 +178,15 @@ Progress and the open work are tracked in
 
 ## How the device is shared
 
-Bevy 0.20 builds against wgpu 30, the release Cranpose's fork starts from.
-[`wgpu-shim`](wgpu-shim) is a package named `wgpu` that re-exports the fork,
-and a project patches crates.io's `wgpu` with it. Bevy and Cranpose then use one
-`wgpu::Device` type and one device, so frames pass between them as textures,
-with no copies and no unsafe code. Cargo ignores a `[patch]` entry that renames
-a package, so the re-export package is needed.
+Bevy 0.20 builds against wgpu 30. On macOS, Windows and Linux Cranpose takes
+the same wgpu from crates.io, so Bevy and Cranpose use one `wgpu::Device` type
+and one device, and frames pass between them as textures, with no copies and
+no unsafe code. On the web, Android and iOS Cranpose takes its fork of wgpu
+30. [`wgpu-shim`](wgpu-shim) is a package named `wgpu` that re-exports the
+fork, and a web build patches crates.io's `wgpu` with it, so Bevy builds
+against the fork there. Cargo ignores a `[patch]` entry that renames a
+package, so the re-export package is needed. This workspace patches on every
+target, since its Bevy demos also build for the web.
 
 - **Bevy inside Cranpose.** `cranpose_bevy::BevyView` (which
   `rememberBevyView` starts and `BevyScene` shows) runs Bevy on a thread of its

@@ -11,7 +11,7 @@ publish = false
 
 [workspace.dependencies]
 bevy = { version = "0.20", default-features = false }
-cranpose = { version = "0.11.0", default-features = false }
+cranpose = { version = "0.12.0", default-features = false }
 cranpose-bevy = { path = "crates/cranpose-bevy" }
 cranpose-godot = { path = "crates/cranpose-godot" }
 cranpose-gpu-interop = { path = "crates/cranpose-gpu-interop" }
@@ -21,8 +21,10 @@ godot = { version = "0.5.5", features = ["api-4-7"] }
 nature = { path = "examples/nature" }
 wgpu = { version = "30", default-features = false }
 
-# Bevy requires crates.io's wgpu; this resolves it to Cranpose's wgpu fork, so
-# Bevy and Cranpose share one wgpu crate and one device.
+# Bevy requires crates.io's wgpu. Cranpose takes the same one on desktop and
+# its fork on the web, so the web demos resolve crates.io's wgpu to the fork.
+# A patch applies to every target, so the desktop demos build on the fork too;
+# the templates, as a desktop project would, build without it.
 [patch.crates-io]
 wgpu = { path = "wgpu-shim" }
 
