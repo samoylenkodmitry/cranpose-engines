@@ -1,4 +1,4 @@
-use demo_ui::{Controls, HudBridge, HudCommand, Stats, Walk};
+use demo_ui::{HudBridge, Stats, Walk};
 use godot::{
     classes::{
         CanvasLayer, DisplayServer, Engine, INode, Input, InputEvent, InputEventMouseMotion, Node,
@@ -51,9 +51,7 @@ impl INode for CranposeHudDemo {
         };
         if let Some(states) = bridge.states.get().copied() {
             for command in bridge.commands.borrow_mut().drain(..) {
-                match command {
-                    HudCommand::BackToStart => states.controls.update(Controls::back_to_start),
-                }
+                states.controls.update(|controls| command.apply(controls));
             }
             let walk = Walk {
                 stick: states.controls.value().walk.stick,

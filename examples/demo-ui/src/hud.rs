@@ -5,11 +5,7 @@ use std::{
 
 use cranpose::{liquid::LiquidTheme, prelude::*};
 
-use crate::{Controls, MUTED, SceneSliders, TouchStick, text_style, walk_hint};
-
-pub enum HudCommand {
-    BackToStart,
-}
+use crate::{Controls, MUTED, SceneCommand, SceneSliders, TouchStick, text_style, walk_hint};
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Stats {
@@ -33,7 +29,7 @@ pub struct HudBridge {
     /// Whether the screen is a touch screen before the first touch tells.
     pub touch: bool,
     pub states: Rc<OnceCell<HudStates>>,
-    pub commands: Rc<RefCell<Vec<HudCommand>>>,
+    pub commands: Rc<RefCell<Vec<SceneCommand>>>,
 }
 
 impl HudBridge {
@@ -367,7 +363,7 @@ fn SceneButton(settings: MutableState<bool>) {
 fn BackToStart(bridge: HudBridge) {
     let commands = Rc::clone(&bridge.commands);
     HudButton("Back to start", move || {
-        commands.borrow_mut().push(HudCommand::BackToStart)
+        commands.borrow_mut().push(SceneCommand::BackToStart)
     });
 }
 

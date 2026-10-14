@@ -47,6 +47,36 @@ struct Explorer {
 #[derive(Resource)]
 struct WaterMaterial(Handle<StandardMaterial>);
 
+/// The valley's ground, for placing things on it.
+#[derive(Resource, Clone, Copy)]
+pub struct Ground(Terrain);
+
+impl Ground {
+    /// The ground's height at `x`, `z`, in metres.
+    pub fn height(&self, x: f32, z: f32) -> f32 {
+        self.0.height(x, z)
+    }
+
+    /// Where the walker starts, on the ground. It looks along +x at first,
+    /// with +z to its right.
+    pub fn start(&self) -> Vec3 {
+        Vec3::from(Walker::start(&self.0).position)
+    }
+
+    /// A spot on the river's bank at `x`, on the side of `toward_z`: the
+    /// first point from the river's middle that stands `above` metres over
+    /// the water.
+    pub fn bank(&self, x: f32, toward_z: f32, above: f32) -> Vec3 {
+        let middle = self.0.river_center(x);
+        let step = 0.25 * (toward_z - middle).signum();
+        let z = (1..400)
+            .map(|steps| middle + step * steps as f32)
+            .find(|z| self.0.height(x, *z) >= self.0.water_level + above)
+            .unwrap_or(toward_z);
+        Vec3::new(x, self.0.height(x, z), z)
+    }
+}
+
 /// How much the scene asks of the GPU.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Quality {
@@ -62,6 +92,7 @@ pub enum Quality {
 pub fn build(app: &mut App, target: RenderTarget, quality: Quality) {
     let valley = Valley::new(SEED);
     app.insert_resource(SceneControls::default())
+        .insert_resource(Ground(valley.terrain))
         .init_resource::<SceneStats>()
         .insert_resource(Explorer {
             terrain: valley.terrain,

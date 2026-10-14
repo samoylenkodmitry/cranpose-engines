@@ -16,6 +16,7 @@ bevy_winit = ["bevy/bevy_winit"]
 bevy = { workspace = true, features = [
     "default_app",
     "3d_bevy_render",
+    "mesh_picking",
     "multi_threaded",
     "std",
 ] }

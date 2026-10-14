@@ -9,6 +9,7 @@ them as GPU textures; no pixels go through the CPU.
 | --- | --- | --- |
 | The engine's scene inside Cranpose | `cranpose_bevy::BevyScene` | the `godot` example's `window.tscn` |
 | A Cranpose HUD over the engine | `cranpose_bevy::hud::CranposeHudPlugin` | `cranpose_godot::Surface` |
+| A Cranpose screen in the engine's world | `cranpose_bevy::screen::CranposeScreen` | |
 
 ![Bevy inside Cranpose](screenshots/bevy-in-cranpose.jpg)
 
@@ -31,7 +32,12 @@ has the two Bevy examples for macOS, Linux and Windows, and the Godot example
 project for macOS. All four show the same valley: a winding river, trees,
 flower meadows, grass and rocks, closed by mountains. Walk with WASD or the
 arrow keys, run with Shift, and drag to look. Inside a Cranpose window, click
-the scene first so it has the keyboard focus.
+the scene first so it has the keyboard focus. In the HUD example someone left
+an office down on the river's bank, as in the backrooms: an old desk with a
+tube monitor, a fallen chair, and a piece of yellow wall with a flickering
+light. Walk down to the desk: the monitor's green screen is a Cranpose
+composition on a mesh in Bevy's world, and within reach its keys change the
+light.
 
 The macOS builds are not signed, so macOS asks before it opens one the first
 time: allow it in System Settings, Privacy & Security. The Godot example needs
@@ -93,8 +99,22 @@ wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0
 - **A Cranpose HUD in a Bevy game.** Add `CranposeHudPlugin::new(content)` and
   put `HudCamera` on the camera the HUD draws over. `content` gets Bevy's world
   once, to share state with the game, and returns the HUD's root composable.
-  `HudInput` tells the game whether the HUD took the pointer, a finger or
-  the keys.
+  `CranposeInput` tells the game whether a Cranpose surface took the
+  pointer, a finger or the keys.
+- **A Cranpose screen in a Bevy world.** Add `CranposeScreenPlugin` and give
+  an entity a `Mesh3d` with UVs and a `CranposeScreen::new(size, density,
+  content)`. The plugin gives the mesh a material that shows the composition,
+  and sends it the pointer, the fingers and the keys that land on it:
+
+  ```rust
+  commands.spawn((
+      Mesh3d(meshes.add(Rectangle::new(1.6, 1.0))),
+      Transform::from_xyz(0.0, 1.5, -3.0),
+      CranposeScreen::new(Vec2::new(512.0, 320.0), 2.5, |_world| {
+          Box::new(|| MyTerminal())
+      }),
+  ));
+  ```
 - **A Cranpose HUD in Godot.** Depend on `cranpose-godot` (no patch needed),
   declare the extension with `cranpose_godot::godot_extension!(Extension)`, and
   give a node a `Surface` on a `CanvasLayer`. Call `draw` each frame and pass
@@ -172,10 +192,19 @@ a package, so the re-export package is needed.
   only when the composition changed, while the render world reads the other.
   A pass after Bevy's upscaling blends the newest HUD over the camera's final
   image with premultiplied alpha, at the target's size from the same frame.
-  `HudInput` tells the game whether the HUD took the held press, which
-  finger it took, and whether it took the last key. The HUD takes one finger
-  at a time, the first that lands on something of the HUD's, so the game can
-  follow the others.
+- **Cranpose screens in Bevy's world.** `cranpose_bevy::screen` draws each
+  `CranposeScreen`'s composition into a texture on Bevy's device, on the main
+  thread, only when it changed, and puts that texture into Bevy's render
+  assets as the image of the screen's material. The material decodes
+  Cranpose's sRGB bytes and lights nothing, as a screen gives off its own
+  light. A ray from the camera through the pointer finds the nearest mesh;
+  when that is a screen, the hit's UV places the pointer in the composition.
+  Meshes without a CPU copy do not block the ray.
+- **Input.** Presses go to the HUD first, then to the screen under the
+  pointer, then to the game. A surface keeps the press it took until it
+  lifts, takes one finger at a time, and gets the keys after the press that
+  last landed on it. `CranposeInput` tells the game what the surfaces took,
+  so the game can follow the other fingers.
 
 ## How Godot is bridged
 

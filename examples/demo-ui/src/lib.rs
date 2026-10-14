@@ -1,5 +1,6 @@
 mod hud;
 mod stick;
+mod terminal;
 mod window;
 
 use cranpose::{
@@ -7,8 +8,9 @@ use cranpose::{
     prelude::*,
     text::TextUnit,
 };
-pub use hud::{Hud, HudBridge, HudCommand, HudStates, Stats};
+pub use hud::{Hud, HudBridge, HudStates, Stats};
 pub use stick::TouchStick;
+pub use terminal::{Light, Terminal, TerminalBridge, TerminalState};
 pub use window::{
     EngineInfo, EngineWindow, HostedEngineWindow, TargetSize, WindowBridge, WindowStates,
     rememberWindowStates,
@@ -80,6 +82,27 @@ impl Default for Controls {
             bloom: 0.3,
             walk: Walk::default(),
             respawn: 0,
+        }
+    }
+}
+
+/// What a panel of the scene asks the game to do.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SceneCommand {
+    BackToStart,
+    /// The light of a time of day, from 0 at dawn to 1 at dusk.
+    TimeOfDay(f32),
+    Fog(f32),
+    Bloom(f32),
+}
+
+impl SceneCommand {
+    pub fn apply(self, controls: &mut Controls) {
+        match self {
+            Self::BackToStart => controls.back_to_start(),
+            Self::TimeOfDay(time) => controls.time_of_day = time,
+            Self::Fog(fog) => controls.fog = fog,
+            Self::Bloom(bloom) => controls.bloom = bloom,
         }
     }
 }
