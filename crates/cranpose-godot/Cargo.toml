@@ -11,4 +11,4 @@ description = "Cranpose in Godot 4: a composition drawn over Godot's frame on Go
 cranpose = { workspace = true, features = ["renderer-wgpu", "embedded-default-font"] }
 cranpose-gpu-interop = { workspace = true, features = ["godot"] }
 godot = { workspace = true }
-wgpu = { package = "cranpose-wgpu", version = "30.0.15", default-features = false }
+wgpu = { package = "cranpose-wgpu", version = "30.0.16", default-features = false }
