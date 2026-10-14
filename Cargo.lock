@@ -3214,6 +3214,7 @@ name = "demo-scene"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "cranpose-bevy",
  "demo-ui",
  "nature",
 ]

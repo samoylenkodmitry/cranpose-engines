@@ -22,14 +22,23 @@ use bevy::{
     light::{Atmosphere, AtmosphereEnvironmentMapLight, atmosphere::ScatteringMedium},
     pbr::AtmosphereSettings,
 };
-use demo_ui::Controls;
+use cranpose_bevy::screen::CranposeScreenPlugin;
+use demo_ui::{Controls, SceneCommand};
 use nature::{MeshData, Stride, Terrain, Valley, Walker};
+
+mod relics;
 
 const SEED: u32 = 7;
 const WATER_TILE: f32 = 9.0;
 
 #[derive(Resource, Clone, Copy, Default, PartialEq, Deref, DerefMut)]
 pub struct SceneControls(pub Controls);
+
+/// What the things in the valley, such as the old computer's screen, ask of
+/// the scene's controls. The app that owns the controls applies them and
+/// clears the list.
+#[derive(Resource, Default)]
+pub struct SceneCommands(pub Vec<SceneCommand>);
 
 #[derive(Resource, Clone, Copy, Default, PartialEq)]
 pub struct SceneStats {
@@ -88,10 +97,17 @@ pub enum Quality {
     Phone,
 }
 
-/// Adds the valley and its camera, which renders into `target`.
+/// Adds the valley and its camera, which renders into `target`, with office
+/// things left on the river's bank below the start: a computer on a desk,
+/// whose Cranpose screen works when the walker comes near, and sends
+/// [`SceneCommands`].
 pub fn build(app: &mut App, target: RenderTarget, quality: Quality) {
     let valley = Valley::new(SEED);
+    if !app.is_plugin_added::<CranposeScreenPlugin>() {
+        app.add_plugins(CranposeScreenPlugin);
+    }
     app.insert_resource(SceneControls::default())
+        .init_resource::<SceneCommands>()
         .insert_resource(Ground(valley.terrain))
         .init_resource::<SceneStats>()
         .insert_resource(Explorer {
@@ -116,7 +132,11 @@ pub fn build(app: &mut App, target: RenderTarget, quality: Quality) {
                 )
             },
         )
-        .add_systems(Update, (walk, sun, water));
+        .add_systems(Startup, relics::place)
+        .add_systems(
+            Update,
+            (walk, sun, water, relics::sync_terminal, relics::flicker),
+        );
     if quality == Quality::Phone {
         app.insert_resource(DirectionalLightShadowMap { size: 1024 });
     }

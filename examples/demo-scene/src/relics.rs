@@ -9,8 +9,9 @@ use bevy::{
     prelude::*,
 };
 use cranpose_bevy::screen::CranposeScreen;
-use demo_scene::Ground;
-use demo_ui::{HudBridge, Light, TerminalBridge, TerminalState};
+use demo_ui::{Light, TerminalBridge, TerminalState};
+
+use crate::{Ground, SceneCommands, SceneControls};
 
 // How near the camera must be for the pointer to reach the screen, in metres.
 const REACH: f32 = 3.0;
@@ -314,31 +315,30 @@ pub(crate) fn flicker(
     }
 }
 
-// The terminal's commands change the HUD's controls, which the terminal
-// shows, with whether the walker stands near enough to use it and the
-// blinking of its cursor.
+// The terminal's commands go to the owner of the scene's controls, which the
+// terminal shows, with whether the walker stands near enough to use it and
+// the blinking of its cursor.
 pub(crate) fn sync_terminal(
-    hud: Option<NonSend<HudBridge>>,
     terminal: Option<NonSend<TerminalBridge>>,
+    controls: Res<SceneControls>,
+    mut commands: ResMut<SceneCommands>,
     time: Res<Time>,
     cameras: Query<&GlobalTransform, With<Camera3d>>,
     screens: Query<&GlobalTransform, With<OldScreen>>,
 ) {
-    let (Some(hud), Some(terminal)) = (hud, terminal) else {
+    let Some(terminal) = terminal else {
         return;
     };
-    let Some(states) = hud.states.get().copied() else {
-        return;
-    };
-    for command in terminal.commands.borrow_mut().drain(..) {
-        states.controls.update(|controls| command.apply(controls));
+    let mut sent = terminal.commands.borrow_mut();
+    if !sent.is_empty() {
+        commands.0.append(&mut sent);
     }
     let near = cameras
         .iter()
         .zip(screens.iter())
         .any(|(camera, screen)| camera.translation().distance(screen.translation()) <= REACH);
     let state = TerminalState {
-        light: Light::of(&states.controls.value()),
+        light: Light::of(&controls.0),
         near,
         cursor: time.elapsed_secs().fract() < 0.5,
     };

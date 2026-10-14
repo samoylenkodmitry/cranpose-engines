@@ -1,5 +1,5 @@
 use bevy::{
-    camera::RenderTarget,
+    camera::{ManualTextureViewHandle, RenderTarget},
     ecs::system::SystemParam,
     input::{
         ButtonState, InputSystems,
@@ -46,6 +46,30 @@ impl CranposeInput {
     pub fn took_finger(&self, finger: u64) -> bool {
         self.fingers.contains(&finger)
     }
+
+    /// Whether a surface holds the mouse press or a finger.
+    pub fn holds_press(&self) -> bool {
+        self.pointer || !self.fingers.is_empty()
+    }
+}
+
+/// Where the pointer's positions lie: in the primary window, or in the
+/// frames of a [`crate::BevyView`], which go to this texture view.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum PointerTarget {
+    #[default]
+    PrimaryWindow,
+    TextureView(ManualTextureViewHandle),
+}
+
+impl PointerTarget {
+    fn draws_to(self, target: &RenderTarget) -> bool {
+        match (self, target) {
+            (Self::PrimaryWindow, RenderTarget::Window(WindowRef::Primary)) => true,
+            (Self::TextureView(view), RenderTarget::TextureView(target)) => view == *target,
+            _ => false,
+        }
+    }
 }
 
 /// Routes input to the HUD and the screens. The plugins that draw them add
@@ -55,6 +79,7 @@ pub(crate) struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CranposeInput>()
+            .init_resource::<PointerTarget>()
             .add_systems(PreUpdate, route_input.after(InputSystems));
     }
 }
@@ -96,6 +121,7 @@ struct PointerInput<'w, 's> {
 #[derive(SystemParam)]
 struct Picker<'w, 's> {
     ray_cast: MeshRayCast<'w, 's>,
+    target: Res<'w, PointerTarget>,
     cameras: Query<
         'w,
         's,
@@ -368,15 +394,13 @@ impl Surfaces<'_> {
 }
 
 impl Picker<'_, '_> {
-    // The ray through a point of the primary window, from the active camera
-    // drawn last there.
+    // The ray through a point of the pointer's target, from the active
+    // camera drawn last there.
     fn ray(&self, at: Vec2) -> Option<Ray3d> {
         let (camera, transform, _) = self
             .cameras
             .iter()
-            .filter(|(camera, _, target)| {
-                camera.is_active && matches!(target, RenderTarget::Window(WindowRef::Primary))
-            })
+            .filter(|(camera, _, target)| camera.is_active && self.target.draws_to(target))
             .max_by_key(|(camera, ..)| camera.order)?;
         let origin = camera
             .logical_viewport_rect()

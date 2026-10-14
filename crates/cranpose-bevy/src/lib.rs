@@ -22,7 +22,7 @@ use bevy::render::{
 use cranpose::{GpuContext, GpuRequirements};
 pub use input::CranposeInput;
 pub use scene::{BevyScene, rememberBevyView};
-pub use view::BevyView;
+pub use view::{BevyView, ViewPointer};
 
 // Gets Bevy's world once and returns a composition's root.
 type ContentFactory = dyn Fn(&mut World) -> Box<dyn FnMut()> + Send + Sync;

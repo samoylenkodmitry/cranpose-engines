@@ -1,10 +1,12 @@
 //! Bevy's valley inside a Cranpose window, for the desktop and the web.
 
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, sync::mpsc};
 
+use bevy::prelude::{ResMut, Update};
 use cranpose::{prelude::*, *};
 use cranpose_bevy::{BevyScene, rememberBevyView};
-use demo_scene::{Quality, SceneControls};
+use demo_scene::{Quality, SceneCommands, SceneControls};
+use demo_ui::SceneCommand;
 use demo_ui::{EngineInfo, EngineWindow, rememberWindowStates};
 
 const BEVY: EngineInfo = EngineInfo {
@@ -37,7 +39,21 @@ const PHONE_DENSITY: f32 = 1.5;
 pub fn Root(touch: bool) {
     let states = rememberWindowStates(touch);
     let quality = if touch { Quality::Phone } else { Quality::Full };
-    let bevy = rememberBevyView(move |app, target| demo_scene::build(app, target, quality));
+    // The scene's commands, such as the old computer's, come back over this
+    // channel from Bevy's thread.
+    let (to_window, from_scene) = remember(|| {
+        let (sender, receiver) = mpsc::channel::<SceneCommand>();
+        (sender, Rc::new(receiver))
+    })
+    .with(|(sender, receiver)| (sender.clone(), Rc::clone(receiver)));
+    let bevy = rememberBevyView(move |app, target| {
+        demo_scene::build(app, target, quality);
+        app.add_systems(Update, move |mut commands: ResMut<SceneCommands>| {
+            for command in commands.0.drain(..) {
+                let _ = to_window.send(command);
+            }
+        });
+    });
     if let Some(bevy) = &bevy
         && touch
     {
@@ -55,6 +71,9 @@ pub fn Root(touch: bool) {
         let Some(bevy) = counted.as_ref() else {
             return;
         };
+        for command in from_scene.try_iter() {
+            states.controls.update(|controls| command.apply(controls));
+        }
         let (since, shown) = counter.get();
         let elapsed = now.saturating_sub(since);
         if since == 0 {

@@ -32,12 +32,13 @@ has the two Bevy examples for macOS, Linux and Windows, and the Godot example
 project for macOS. All four show the same valley: a winding river, trees,
 flower meadows, grass and rocks, closed by mountains. Walk with WASD or the
 arrow keys, run with Shift, and drag to look. Inside a Cranpose window, click
-the scene first so it has the keyboard focus. In the HUD example someone left
-an office down on the river's bank, as in the backrooms: an old desk with a
-tube monitor, a fallen chair, and a piece of yellow wall with a flickering
+the scene first so it has the keyboard focus. In both Bevy examples someone
+left an office down on the river's bank, as in the backrooms: an old desk with
+a tube monitor, a fallen chair, and a piece of yellow wall with a flickering
 light. Walk down to the desk: the monitor's green screen is a Cranpose
 composition on a mesh in Bevy's world, and within reach its keys change the
-light.
+light. Inside a Cranpose window, the view hands the pointer to Bevy's world, so
+the monitor takes the clicks there too.
 
 The macOS builds are not signed, so macOS asks before it opens one the first
 time: allow it in System Settings, Privacy & Security. The Godot example needs
