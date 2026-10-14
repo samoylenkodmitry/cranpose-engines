@@ -1,4 +1,7 @@
-//! A Cranpose HUD over Bevy's valley, for the desktop and the web.
+//! A Cranpose HUD over Bevy's valley, and an old computer left on the
+//! river's bank whose screen is Cranpose too, for the desktop and the web.
+
+mod relics;
 
 use bevy::{
     camera::RenderTarget,
@@ -6,11 +9,17 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowResolution},
 };
-use cranpose_bevy::hud::{CranposeHudPlugin, HudCamera, HudInput};
+use cranpose_bevy::{
+    CranposeInput,
+    hud::{CranposeHudPlugin, HudCamera},
+    screen::CranposeScreenPlugin,
+};
 use demo_scene::{Quality, SceneControls, SceneStats};
-use demo_ui::{Controls, HudBridge, HudCommand, Stats, Walk};
+use demo_ui::{HudBridge, Stats, Walk};
 
-/// The game: Bevy's valley with a Cranpose HUD over its camera. On the web
+/// The game: Bevy's valley with a Cranpose HUD over its camera, and office
+/// things left on the river's bank below the start: a computer on a desk,
+/// whose Cranpose screen works when the walker comes near. On the web
 /// it draws into the page's `app` canvas. `touch` says whether the screen is
 /// a phone's touch screen: the HUD then shows its stick before the first
 /// touch, and the scene renders the phone's quality.
@@ -32,8 +41,20 @@ pub fn app(touch: bool) -> App {
         world.insert_non_send(bridge.clone());
         Box::new(move || demo_ui::Hud(bridge.clone()))
     }))
+    .add_plugins(CranposeScreenPlugin)
+    .add_systems(Startup, relics::place)
     .add_systems(PostStartup, draw_hud_over_the_camera)
-    .add_systems(Update, (look_and_walk, run_commands, sync_hud).chain());
+    .add_systems(
+        Update,
+        (
+            look_and_walk,
+            run_commands,
+            sync_hud,
+            relics::sync_terminal,
+            relics::flicker,
+        )
+            .chain(),
+    );
     let quality = if touch { Quality::Phone } else { Quality::Full };
     demo_scene::build(&mut app, RenderTarget::default(), quality);
     app
@@ -45,15 +66,15 @@ fn draw_hud_over_the_camera(mut commands: Commands, cameras: Query<Entity, With<
     }
 }
 
-// Keys walk; the mouse and every finger the HUD did not take look around.
-// The HUD's stick writes its part of the walk itself.
+// Keys walk; the mouse and every finger no Cranpose surface took look
+// around. The HUD's stick writes its part of the walk itself.
 fn look_and_walk(
     bridge: Option<NonSend<HudBridge>>,
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     motion: Res<AccumulatedMouseMotion>,
     touches: Res<Touches>,
-    hud: Res<HudInput>,
+    input: Res<CranposeInput>,
 ) {
     let Some(states) = bridge
         .as_ref()
@@ -64,7 +85,7 @@ fn look_and_walk(
     if touches.any_just_pressed() && !states.touch.value() {
         states.touch.set(true);
     }
-    let held = |codes: [KeyCode; 2]| !hud.keyboard && keys.any_pressed(codes);
+    let held = |codes: [KeyCode; 2]| !input.keyboard && keys.any_pressed(codes);
     let current = states.controls.value();
     let walk = Walk {
         forward: held([KeyCode::KeyW, KeyCode::ArrowUp]),
@@ -74,13 +95,13 @@ fn look_and_walk(
         run: held([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
         stick: current.walk.stick,
     };
-    let mut look = if buttons.pressed(MouseButton::Left) && !hud.pointer {
+    let mut look = if buttons.pressed(MouseButton::Left) && !input.pointer {
         motion.delta
     } else {
         Vec2::ZERO
     };
     for touch in touches.iter() {
-        if hud.finger != Some(touch.id()) {
+        if !input.took_finger(touch.id()) {
             look += touch.delta();
         }
     }
@@ -138,9 +159,7 @@ fn run_commands(bridge: Option<NonSend<HudBridge>>) {
         return;
     };
     for command in bridge.commands.borrow_mut().drain(..) {
-        match command {
-            HudCommand::BackToStart => states.controls.update(Controls::back_to_start),
-        }
+        states.controls.update(|controls| command.apply(controls));
     }
 }
 

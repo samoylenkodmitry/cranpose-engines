@@ -14,6 +14,7 @@ cargo run
 ```
 
 Start with the game in `src/main.rs` and the panel in `src/hud.rs`, and rename
-the package in `Cargo.toml`. `cranpose_bevy::hud::HudInput` tells the game's
+the package in `Cargo.toml`. `cranpose_bevy::CranposeInput` tells the game's
 systems whether the HUD took the pointer, a finger or the keys, so they can
-leave that input alone.
+leave that input alone. `cranpose_bevy::screen::CranposeScreen` puts a
+Cranpose composition on a mesh in the world, such as a computer's screen.
