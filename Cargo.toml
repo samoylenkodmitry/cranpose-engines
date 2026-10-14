@@ -11,7 +11,7 @@ publish = false
 
 [workspace.dependencies]
 bevy = { version = "0.20", default-features = false }
-cranpose = { version = "0.9.40", default-features = false }
+cranpose = { version = "0.9.41", default-features = false }
 cranpose-bevy = { path = "crates/cranpose-bevy" }
 cranpose-godot = { path = "crates/cranpose-godot" }
 cranpose-gpu-interop = { path = "crates/cranpose-gpu-interop" }

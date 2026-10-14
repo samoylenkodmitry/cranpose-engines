@@ -11,7 +11,7 @@ bevy = { version = "0.20", default-features = false, features = [
     "multi_threaded",
     "std",
 ] }
-cranpose = { version = "0.9.40", default-features = false, features = [
+cranpose = { version = "0.9.41", default-features = false, features = [
     "desktop",
     "renderer-wgpu",
     "embedded-default-font",
