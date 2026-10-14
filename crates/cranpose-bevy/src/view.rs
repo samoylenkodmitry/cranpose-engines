@@ -1,6 +1,12 @@
-use std::cell::Cell;
 #[cfg(target_arch = "wasm32")]
 use std::cell::RefCell;
+use std::{
+    cell::Cell,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
     sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel},
@@ -10,6 +16,11 @@ use std::{
 use bevy::{
     app::PluginsState,
     camera::{ManualTextureViewHandle, RenderTarget},
+    input::{
+        ButtonState,
+        mouse::MouseButtonInput,
+        touch::{TouchInput, TouchPhase},
+    },
     math::UVec2,
     prelude::*,
     render::{
@@ -17,9 +28,11 @@ use bevy::{
         extract_resource::{ExtractResource, ExtractResourcePlugin},
         texture::{ManualTextureView, ManualTextureViews},
     },
-    window::ExitCondition,
+    window::{CursorMoved, ExitCondition},
 };
 use cranpose::{ExternalFrames, FrameWriter, GpuContext, prelude::ImageBitmap};
+
+use crate::{CranposeInput, input::PointerTarget};
 
 const TARGET: ManualTextureViewHandle = ManualTextureViewHandle(0);
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -38,18 +51,38 @@ type Command = Box<dyn FnOnce(&mut World) + Send>;
 /// Bevy runs without its window plugin, since windows belong to Cranpose and
 /// Bevy's thread is not the main thread. A build that also turns on Bevy's
 /// `bevy_winit` feature, such as one with a Bevy game window, turns on this
-/// crate's `bevy_winit` feature too, which leaves the plugin out.
+/// crate's `bevy_winit` feature too, which leaves the plugin out. The pointer
+/// reaches Bevy's world through [`Self::pointer`], as a window's would.
 pub struct BevyView {
     frames: ExternalFrames,
     runner: Runner,
     shown: Cell<u64>,
     max_density: Cell<f32>,
+    holds_press: Arc<AtomicBool>,
+}
+
+/// A pointer sample on a [`BevyView`], in the pixels of Bevy's frames.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ViewPointer {
+    /// The mouse moved here.
+    Moved(Vec2),
+    /// The left button went down here.
+    Pressed(Vec2),
+    /// The left button went up here.
+    Released(Vec2),
+    /// A finger touched, moved or lifted here.
+    Touch {
+        finger: u64,
+        phase: TouchPhase,
+        at: Vec2,
+    },
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 struct Runner {
     ticks: Option<SyncSender<()>>,
     commands: Sender<Command>,
+    pointers: Sender<ViewPointer>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -66,6 +99,11 @@ struct FrameNumber(u64);
 #[derive(Resource)]
 struct Publisher(FrameWriter);
 
+// Tells the composition whether a Cranpose surface in Bevy's world holds the
+// press.
+#[derive(Resource)]
+struct PressReport(Arc<AtomicBool>);
+
 impl BevyView {
     /// Starts Bevy. `setup` adds the scene and gets the render target its
     /// camera draws into.
@@ -74,12 +112,14 @@ impl BevyView {
         setup: impl FnOnce(&mut App, RenderTarget) + Send + 'static,
     ) -> std::io::Result<Self> {
         let frames = ExternalFrames::new(gpu, FORMAT, wgpu::TextureUsages::RENDER_ATTACHMENT, true);
-        let runner = Runner::start(gpu, frames.writer(), setup)?;
+        let holds_press = Arc::new(AtomicBool::new(false));
+        let runner = Runner::start(gpu, frames.writer(), Arc::clone(&holds_press), setup)?;
         Ok(Self {
             frames,
             runner,
             shown: Cell::new(0),
             max_density: Cell::new(f32::INFINITY),
+            holds_press,
         })
     }
 
@@ -117,6 +157,20 @@ impl BevyView {
     pub fn send(&self, command: impl FnOnce(&mut World) + Send + 'static) {
         self.runner.send(Box::new(command));
     }
+
+    /// Hands Bevy's world a pointer sample before its next update, as the
+    /// window messages a Bevy game gets: `CursorMoved`, `MouseButtonInput`
+    /// and `TouchInput`. [`crate::BevyScene`] sends the pointer that lands
+    /// on it.
+    pub fn pointer(&self, sample: ViewPointer) {
+        self.runner.pointer(sample);
+    }
+
+    /// Whether a Cranpose screen in Bevy's world held the press when Bevy
+    /// last updated, for the composition around the view to leave it alone.
+    pub fn holds_press(&self) -> bool {
+        self.holds_press.load(Ordering::Relaxed)
+    }
 }
 
 impl PartialEq for BevyView {
@@ -130,20 +184,28 @@ impl Runner {
     fn start(
         gpu: &GpuContext,
         writer: FrameWriter,
+        holds_press: Arc<AtomicBool>,
         setup: impl FnOnce(&mut App, RenderTarget) + Send + 'static,
     ) -> std::io::Result<Self> {
         let (ticks, tick_receiver) = sync_channel(1);
         let (commands, command_receiver) = channel();
+        let (pointers, pointer_receiver) = channel();
         let gpu = gpu.clone();
         let thread = std::thread::Builder::new()
             .name("bevy".into())
             .spawn(move || {
-                let mut app = start(&gpu, writer.clone(), setup);
-                run(&mut app, &writer, &tick_receiver, &command_receiver);
+                let mut app = start(&gpu, writer.clone(), holds_press, setup);
+                let inputs = Inputs {
+                    ticks: tick_receiver,
+                    commands: command_receiver,
+                    pointers: pointer_receiver,
+                };
+                run(&mut app, &writer, &inputs);
             })?;
         Ok(Self {
             ticks: Some(ticks),
             commands,
+            pointers,
             thread: Some(thread),
         })
     }
@@ -157,6 +219,10 @@ impl Runner {
 
     fn send(&self, command: Command) {
         let _ = self.commands.send(command);
+    }
+
+    fn pointer(&self, sample: ViewPointer) {
+        let _ = self.pointers.send(sample);
     }
 }
 
@@ -177,10 +243,11 @@ impl Runner {
     fn start(
         gpu: &GpuContext,
         writer: FrameWriter,
+        holds_press: Arc<AtomicBool>,
         setup: impl FnOnce(&mut App, RenderTarget) + Send + 'static,
     ) -> std::io::Result<Self> {
         Ok(Self {
-            app: RefCell::new(start(gpu, writer.clone(), setup)),
+            app: RefCell::new(start(gpu, writer.clone(), holds_press, setup)),
             writer,
         })
     }
@@ -198,9 +265,20 @@ impl Runner {
             command(app.world_mut());
         }
     }
+
+    fn pointer(&self, sample: ViewPointer) {
+        if let Ok(mut app) = self.app.try_borrow_mut() {
+            write_pointer(app.world_mut(), sample);
+        }
+    }
 }
 
-fn start(gpu: &GpuContext, writer: FrameWriter, setup: impl FnOnce(&mut App, RenderTarget)) -> App {
+fn start(
+    gpu: &GpuContext,
+    writer: FrameWriter,
+    holds_press: Arc<AtomicBool>,
+    setup: impl FnOnce(&mut App, RenderTarget),
+) -> App {
     let mut app = App::new();
     let plugins = DefaultPlugins
         .set(RenderPlugin {
@@ -218,7 +296,10 @@ fn start(gpu: &GpuContext, writer: FrameWriter, setup: impl FnOnce(&mut App, Ren
     #[cfg(feature = "bevy_winit")]
     let plugins = plugins.disable::<bevy::winit::WinitPlugin>();
     app.add_plugins(plugins)
-        .add_plugins(ExtractResourcePlugin::<FrameNumber>::default());
+        .add_plugins(ExtractResourcePlugin::<FrameNumber>::default())
+        .insert_resource(PressReport(holds_press))
+        .insert_resource(PointerTarget::TextureView(TARGET))
+        .add_systems(Update, report_press);
     if let Some(render) = app.get_sub_app_mut(RenderApp) {
         render
             .insert_resource(Publisher(writer))
@@ -249,14 +330,61 @@ fn ready(app: &mut App) -> bool {
     }
 }
 
+// What Bevy's thread receives from the composition.
 #[cfg(not(target_arch = "wasm32"))]
-fn run(app: &mut App, writer: &FrameWriter, ticks: &Receiver<()>, commands: &Receiver<Command>) {
-    while ticks.recv().is_ok() {
-        for command in commands.try_iter() {
+struct Inputs {
+    ticks: Receiver<()>,
+    commands: Receiver<Command>,
+    pointers: Receiver<ViewPointer>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn run(app: &mut App, writer: &FrameWriter, inputs: &Inputs) {
+    while inputs.ticks.recv().is_ok() {
+        for command in inputs.commands.try_iter() {
             command(app.world_mut());
+        }
+        for sample in inputs.pointers.try_iter() {
+            write_pointer(app.world_mut(), sample);
         }
         step(app, writer);
     }
+}
+
+fn write_pointer(world: &mut World, sample: ViewPointer) {
+    let window = Entity::PLACEHOLDER;
+    let (at, button) = match sample {
+        ViewPointer::Moved(at) => (at, None),
+        ViewPointer::Pressed(at) => (at, Some(ButtonState::Pressed)),
+        ViewPointer::Released(at) => (at, Some(ButtonState::Released)),
+        ViewPointer::Touch { finger, phase, at } => {
+            world.write_message(TouchInput {
+                phase,
+                position: at,
+                window,
+                force: None,
+                id: finger,
+            });
+            return;
+        }
+    };
+    world.write_message(CursorMoved {
+        window,
+        position: at,
+        delta: None,
+    });
+    if let Some(state) = button {
+        world.write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state,
+            window,
+        });
+    }
+}
+
+fn report_press(input: Option<Res<CranposeInput>>, report: Res<PressReport>) {
+    let holds = input.is_some_and(|input| input.holds_press());
+    report.0.store(holds, Ordering::Relaxed);
 }
 
 // Renders one frame into the next free texture. Every texture is in use while

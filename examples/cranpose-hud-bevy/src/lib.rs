@@ -1,8 +1,6 @@
 //! A Cranpose HUD over Bevy's valley, and an old computer left on the
 //! river's bank whose screen is Cranpose too, for the desktop and the web.
 
-mod relics;
-
 use bevy::{
     camera::RenderTarget,
     input::{mouse::AccumulatedMouseMotion, touch::Touches},
@@ -12,9 +10,8 @@ use bevy::{
 use cranpose_bevy::{
     CranposeInput,
     hud::{CranposeHudPlugin, HudCamera},
-    screen::CranposeScreenPlugin,
 };
-use demo_scene::{Quality, SceneControls, SceneStats};
+use demo_scene::{Quality, SceneCommands, SceneControls, SceneStats};
 use demo_ui::{HudBridge, Stats, Walk};
 
 /// The game: Bevy's valley with a Cranpose HUD over its camera, and office
@@ -41,20 +38,8 @@ pub fn app(touch: bool) -> App {
         world.insert_non_send(bridge.clone());
         Box::new(move || demo_ui::Hud(bridge.clone()))
     }))
-    .add_plugins(CranposeScreenPlugin)
-    .add_systems(Startup, relics::place)
     .add_systems(PostStartup, draw_hud_over_the_camera)
-    .add_systems(
-        Update,
-        (
-            look_and_walk,
-            run_commands,
-            sync_hud,
-            relics::sync_terminal,
-            relics::flicker,
-        )
-            .chain(),
-    );
+    .add_systems(Update, (look_and_walk, run_commands, sync_hud).chain());
     let quality = if touch { Quality::Phone } else { Quality::Full };
     demo_scene::build(&mut app, RenderTarget::default(), quality);
     app
@@ -151,14 +136,20 @@ fn sync_hud(
     *frames = 0;
 }
 
-fn run_commands(bridge: Option<NonSend<HudBridge>>) {
+// The HUD's commands and the scene's, such as the old computer's, change the
+// HUD's controls.
+fn run_commands(bridge: Option<NonSend<HudBridge>>, mut scene: ResMut<SceneCommands>) {
     let Some(bridge) = bridge else {
         return;
     };
     let Some(states) = bridge.states.get().copied() else {
         return;
     };
-    for command in bridge.commands.borrow_mut().drain(..) {
+    let mut hud = bridge.commands.borrow_mut();
+    if hud.is_empty() && scene.0.is_empty() {
+        return;
+    }
+    for command in hud.drain(..).chain(scene.0.drain(..)) {
         states.controls.update(|controls| command.apply(controls));
     }
 }
