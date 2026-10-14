@@ -42,8 +42,43 @@ jobs:
           name: web-${{ matrix.example }}-${{ matrix.build }}
           path: dist/web
 
+  # Godot's web export with the Cranpose extension: Emscripten and the
+  # nightly toolchain build the extension, and a headless Godot exports it.
+  godot:
+    runs-on: ubuntu-24.04
+    env:
+      GODOT: ${{ github.workspace }}/godot/Godot_v4.7.2-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-03
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
+          key: godot
+      - name: Install Emscripten 4.0.20, the version of Godot's web templates
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install 4.0.20
+          "$HOME/emsdk/emsdk" activate 4.0.20
+      - name: Install Godot 4.7.2 and its web templates
+        run: |
+          curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip -d godot
+          scripts/godot-web-templates.py 4.7.2
+      - name: Export the Godot project
+        run: |
+          source "$HOME/emsdk/emsdk_env.sh"
+          scripts/build-web.sh dist/web godot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-godot
+          path: dist/web
+
   site:
-    needs: build
+    needs: [build, godot]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4

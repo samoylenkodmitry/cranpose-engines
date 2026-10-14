@@ -21,24 +21,28 @@ them as GPU textures; no pixels go through the CPU.
 
 ## Try it
 
-The two Bevy examples run in the browser at
-[samoylenkodmitry.github.io/cranpose-engines](https://samoylenkodmitry.github.io/cranpose-engines/):
-on WebGPU where the browser has it (Chrome, Edge, Safari 26), and on WebGL2
-elsewhere, with a plain sky in place of the atmosphere, which needs compute
-shaders. On a phone the controls go under the view, and a stick walks.
+All four examples run in the browser at
+[samoylenkodmitry.github.io/cranpose-engines](https://samoylenkodmitry.github.io/cranpose-engines/).
+The Bevy examples run on WebGPU where the browser has it (Chrome, Edge,
+Safari 26), and on WebGL2 elsewhere, with a plain sky in place of the
+atmosphere, which needs compute shaders. The Godot examples are Godot 4.7's
+web export, which runs on WebGL2: the Cranpose extension runs inside it as
+an Emscripten module and draws on Godot's own WebGL2 context, so Cranpose and
+Godot share their textures without copies. On a phone the controls go under
+the view, and a stick walks.
 
 Each [release](https://github.com/samoylenkodmitry/cranpose-engines/releases)
 has the two Bevy examples for macOS, Linux and Windows, and the Godot example
 project for macOS. All four show the same valley: a winding river, trees,
 flower meadows, grass and rocks, closed by mountains. Walk with WASD or the
 arrow keys, run with Shift, and drag to look. Inside a Cranpose window, click
-the scene first so it has the keyboard focus. In both Bevy examples someone
-left an office down on the river's bank, as in the backrooms: an old desk with
-a tube monitor, a fallen chair, and a piece of yellow wall with a flickering
+the scene first so it has the keyboard focus. In every example someone left
+an office down on the river's bank, as in the backrooms: an old desk with a
+tube monitor, a fallen chair, and a piece of yellow wall with a flickering
 light. Walk down to the desk: the monitor's green screen is a Cranpose
-composition on a mesh in Bevy's world, and within reach its keys change the
-light. Inside a Cranpose window, the view hands the pointer to Bevy's world, so
-the monitor takes the clicks there too.
+composition on a mesh in the engine's world, and within reach its keys change
+the light. Inside a Cranpose window, the view hands the pointer to the
+engine's world, so the monitor takes the clicks there too.
 
 The macOS builds are not signed, so macOS asks before it opens one the first
 time: allow it in System Settings, Privacy & Security. The Godot example needs
@@ -119,7 +123,10 @@ wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0
 - **A Cranpose HUD in Godot.** Depend on `cranpose-godot` (no patch needed),
   declare the extension with `cranpose_godot::godot_extension!(Extension)`, and
   give a node a `Surface` on a `CanvasLayer`. Call `draw` each frame and pass
-  input events to `input` first.
+  input events to `input` first. `Surface::viewport_frame` gives the
+  composition a `SubViewport`'s frames, for Godot's scene inside a Cranpose
+  layout, and a `Screen` is a composition for a mesh's material, such as a
+  computer's screen in the game.
 
 ## Build the examples
 
@@ -155,12 +162,12 @@ WebGL2 build in `pkg-webgl2`; the page loads the one the browser runs.
 
 - Bevy in both directions: macOS (Metal) is tested; the Linux and Windows
   builds use wgpu's Vulkan and D3D12 backends and are built by CI.
-- Godot in both directions: macOS with Godot's Metal driver. The bridge imports
-  Godot's Metal objects; Vulkan and D3D12 are not bridged yet.
+- Godot in both directions: macOS with Godot's Metal driver, and Godot's web
+  export. The bridge imports Godot's Metal objects; Vulkan and D3D12 are not
+  bridged yet.
 - The web: the Bevy directions over WebGPU and WebGL2, tested in Chrome on
   Android and in WebKit. Bevy updates inside Cranpose's frame there, since a
-  page has one thread. Godot's web export renders through its own WebGL
-  context, which is not bridged.
+  page has one thread. The Godot directions over WebGL2, tested in WebKit.
 
 Progress and the open work are tracked in
 [Cranpose#1412](https://github.com/samoylenkodmitry/Cranpose/issues/1412).
@@ -229,6 +236,26 @@ textures over:
   after the copy.
 
 The copies run on the GPU; no pixels pass through the CPU.
+
+On the web, Godot 4.7's export runs on WebGL2 and loads Rust extensions as
+Emscripten side modules, built with the web templates that have extension
+support but no threads (`scripts/build-web.sh out godot`). Cranpose is built
+for `wasm32-unknown-emscripten` and draws with wgpu's GL backend on the WebGL2
+context Godot made current, so there is one context and nothing to copy:
+
+- `cranpose_gpu_interop::gl` wraps the current context as wgpu's adapter.
+  Godot's templates lack Emscripten's `emscripten_webgl_get_proc_address`, so
+  the GL loader is a table of the WebGL entry points the module imports from
+  Godot's main module (`scripts/gl-names.py`).
+- **Cranpose to Godot:** the GL name of Cranpose's texture becomes a Godot
+  texture through `RenderingServer.texture_create_from_native_handle`.
+- **Godot to Cranpose:** the GL name of a `SubViewport`'s render target becomes
+  a wgpu texture Cranpose samples where Godot drew it.
+- After each Cranpose frame, the GL state goes back to what Godot expects:
+  no bindings, the fixed-function tests off, default unpacking.
+
+Godot's web templates abort on a Rust panic, since they have no wasm
+exception support, so the extension builds with `panic = "abort"`.
 
 ## Release
 

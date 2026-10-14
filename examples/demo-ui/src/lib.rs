@@ -12,8 +12,8 @@ pub use hud::{Hud, HudBridge, HudStates, Stats};
 pub use stick::TouchStick;
 pub use terminal::{Light, Terminal, TerminalBridge, TerminalState};
 pub use window::{
-    EngineInfo, EngineWindow, HostedEngineWindow, TargetSize, WindowBridge, WindowStates,
-    rememberWindowStates,
+    EngineInfo, EngineWindow, HostedEngineWindow, ScenePointer, ScenePointers, TargetSize,
+    WindowBridge, WindowStates, rememberWindowStates,
 };
 
 /// How far the stick is pushed before the walker runs.

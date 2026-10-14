@@ -49,49 +49,130 @@ pub fn rememberWindowStates(touch: bool) -> WindowStates {
 pub struct WindowBridge {
     pub states: Rc<OnceCell<WindowStates>>,
     pub size: TargetSize,
+    pub pointer: ScenePointers,
+    /// The screen is a touch screen, so the window shows the touch stick
+    /// before the first touch.
+    pub touch: bool,
 }
 
 impl PartialEq for WindowBridge {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.states, &other.states) && self.size == other.size
+        Rc::ptr_eq(&self.states, &other.states)
+            && self.size == other.size
+            && self.pointer == other.pointer
+            && self.touch == other.touch
+    }
+}
+
+/// A pointer sample on the engine's view, in the pixels of its frames.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ScenePointer {
+    Moved([f32; 2]),
+    Pressed([f32; 2]),
+    Released([f32; 2]),
+}
+
+/// The pointer samples that landed on the engine's view, for the host to
+/// hand its world, and whether something in that world holds the press: the
+/// view then leaves the drag to it rather than look around.
+#[derive(Clone, Default)]
+pub struct ScenePointers {
+    samples: Rc<RefCell<Vec<ScenePointer>>>,
+    held: Rc<Cell<bool>>,
+}
+
+impl PartialEq for ScenePointers {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.samples, &other.samples)
+    }
+}
+
+impl ScenePointers {
+    /// Hands each sample since the last call to `deliver`, which returns
+    /// whether the world holds the press after it.
+    pub fn deliver(&self, mut deliver: impl FnMut(ScenePointer) -> bool) {
+        for sample in self.samples.borrow_mut().drain(..) {
+            self.held.set(deliver(sample));
+        }
     }
 }
 
 #[composable]
 pub fn HostedEngineWindow(engine: EngineInfo, bridge: WindowBridge) {
-    let states = rememberWindowStates(false);
+    let states = rememberWindowStates(bridge.touch);
     bridge.states.get_or_init(|| states);
     let size = bridge.size.clone();
+    let pointer = bridge.pointer.clone();
     EngineWindow(engine, states, move || {
-        FrameView(states.frame, size.clone())
+        FrameView(states.frame, size.clone(), pointer.clone())
     });
 }
 
-/// Shows the frames a host hands over in `frame`, and reports the size in
-/// physical pixels the host should render at.
+/// Shows the frames a host hands over in `frame`, reports the size in
+/// physical pixels the host should render at, and passes it the pointer.
 #[composable]
-fn FrameView(frame: MutableState<Option<ImageBitmap>>, target_size: TargetSize) {
+fn FrameView(
+    frame: MutableState<Option<ImageBitmap>>,
+    target_size: TargetSize,
+    pointer: ScenePointers,
+) {
+    // Pixels per dp, which the drawing learns and the pointer needs.
+    let density = remember(|| Rc::new(Cell::new(1.0f32))).with(Rc::clone);
+    let drawn = Rc::clone(&density);
     Box(
-        Modifier::empty().fill_max_size().draw_behind(move |scope| {
-            let size = scope.size();
-            let density = current_density();
-            target_size.0.set((
-                (size.width * density).round() as u32,
-                (size.height * density).round() as u32,
-            ));
-            if let Some(image) = frame.value() {
-                scope.draw_image_at_sampled(
-                    Rect::from_size(size),
-                    image,
-                    1.0,
-                    None,
-                    ImageSampling::Linear,
-                );
-            }
-        }),
+        Modifier::empty()
+            .fill_max_size()
+            .pointer_input((), move |scope| {
+                let pointer = pointer.clone();
+                let density = Rc::clone(&density);
+                async move {
+                    scope
+                        .await_pointer_event_scope(|events| async move {
+                            loop {
+                                let event = events.await_pointer_event().await;
+                                forward(&pointer, density.get(), &event);
+                            }
+                        })
+                        .await;
+                }
+            })
+            .draw_behind(move |scope| {
+                let size = scope.size();
+                let density = current_density();
+                drawn.set(density);
+                target_size.0.set((
+                    (size.width * density).round() as u32,
+                    (size.height * density).round() as u32,
+                ));
+                if let Some(image) = frame.value() {
+                    scope.draw_image_at_sampled(
+                        Rect::from_size(size),
+                        image,
+                        1.0,
+                        None,
+                        ImageSampling::Linear,
+                    );
+                }
+            }),
         BoxSpec::default(),
         || {},
     );
+}
+
+// Queues `event` for the host in physical pixels, and consumes a move while
+// the host's world holds the press.
+fn forward(pointer: &ScenePointers, density: f32, event: &PointerEvent) {
+    let at = [event.position.x * density, event.position.y * density];
+    let sample = match event.kind {
+        PointerEventKind::Down => ScenePointer::Pressed(at),
+        PointerEventKind::Move => ScenePointer::Moved(at),
+        PointerEventKind::Up | PointerEventKind::Cancel => ScenePointer::Released(at),
+        _ => return,
+    };
+    pointer.samples.borrow_mut().push(sample);
+    if event.kind == PointerEventKind::Move && pointer.held.get() {
+        event.consume();
+    }
 }
 
 // Narrower than this, the controls go under the engine's view.

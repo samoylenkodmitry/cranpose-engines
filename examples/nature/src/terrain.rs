@@ -37,6 +37,19 @@ impl Terrain {
         (z - self.river_center(x)).abs()
     }
 
+    /// A spot on the river's bank at `x`, on the side of `toward_z`: the
+    /// first point from the river's middle that stands `above` metres over
+    /// the water.
+    pub fn bank(&self, x: f32, toward_z: f32, above: f32) -> [f32; 3] {
+        let middle = self.river_center(x);
+        let step = 0.25 * (toward_z - middle).signum();
+        let z = (1..400)
+            .map(|steps| middle + step * steps as f32)
+            .find(|z| self.height(x, *z) >= self.water_level + above)
+            .unwrap_or(toward_z);
+        [x, self.height(x, z), z]
+    }
+
     pub fn height(&self, x: f32, z: f32) -> f32 {
         let distance = self.river_distance(x, z);
         let away = smoothstep(4.0, 40.0, distance);
