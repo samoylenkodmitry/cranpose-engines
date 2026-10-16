@@ -2688,7 +2688,7 @@ dependencies = [
 
 [[package]]
 name = "cranpose-bevy"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "bevy",
  "cranpose",
@@ -2751,7 +2751,7 @@ dependencies = [
 
 [[package]]
 name = "cranpose-godot"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "cranpose",
  "cranpose-gpu-interop",
@@ -2775,7 +2775,7 @@ dependencies = [
 
 [[package]]
 name = "cranpose-gpu-interop"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "cranpose",
  "cranpose-wgpu",

@@ -81,12 +81,14 @@ and its README says what to change first.
 
 ## Add to an existing project
 
-The crates come from this repository by git tag:
+The crates are on crates.io:
 
 ```toml
 [dependencies]
-cranpose-bevy = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.7" }
+cranpose-bevy = "0.1.8"
 ```
+
+A Godot extension depends on `cranpose-godot = "0.1.8"` instead.
 
 On macOS, Windows and Linux that is all: Cranpose takes crates.io's wgpu
 there, the one Bevy builds against. A web build of a Bevy project also
@@ -94,7 +96,7 @@ resolves crates.io's wgpu to the fork Cranpose uses in browsers:
 
 ```toml
 [patch.crates-io]
-wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.7" }
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.8" }
 ```
 
 - **A Bevy scene in a Cranpose app.** Ask the window's device for Bevy's

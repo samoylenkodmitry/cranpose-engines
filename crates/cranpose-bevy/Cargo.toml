@@ -1,11 +1,13 @@
 [package]
 name = "cranpose-bevy"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish.workspace = true
 description = "Bevy and Cranpose on one wgpu device: Bevy scenes inside Cranpose layouts, Cranpose HUDs over Bevy scenes"
+readme = "../../README.md"
+keywords = ["bevy", "cranpose", "gui", "ui", "hud"]
+categories = ["game-development", "gui"]
 
 [features]
 # For a build that also turns on Bevy's `bevy_winit`, such as one with a Bevy
