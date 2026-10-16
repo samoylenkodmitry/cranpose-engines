@@ -23,4 +23,4 @@ nature = { workspace = true }
 wgpu = { workspace = true }
 
 [target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
-wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }
+wgpu = { package = "cranpose-wgpu", version = "30.0.21", default-features = false }
