@@ -85,10 +85,10 @@ The crates are on crates.io:
 
 ```toml
 [dependencies]
-cranpose-bevy = "0.1.8"
+cranpose-bevy = "0.1.9"
 ```
 
-A Godot extension depends on `cranpose-godot = "0.1.8"` instead.
+A Godot extension depends on `cranpose-godot = "0.1.9"` instead.
 
 On macOS, Windows and Linux that is all: Cranpose takes crates.io's wgpu
 there, the one Bevy builds against. A web build of a Bevy project also
@@ -96,7 +96,7 @@ resolves crates.io's wgpu to the fork Cranpose uses in browsers:
 
 ```toml
 [patch.crates-io]
-wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.8" }
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", tag = "v0.1.9" }
 ```
 
 - **A Bevy scene in a Cranpose app.** Ask the window's device for Bevy's

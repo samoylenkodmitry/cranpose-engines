@@ -6,7 +6,7 @@ exclude = ["templates"]
 [workspace.package]
 # The published crates' version, which the release tag sets
 # (scripts/release-version.py).
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/samoylenkodmitry/cranpose-engines"
@@ -15,9 +15,9 @@ publish = false
 [workspace.dependencies]
 bevy = { version = "0.20", default-features = false }
 cranpose = { version = "0.13.0", default-features = false }
-cranpose-bevy = { path = "crates/cranpose-bevy", version = "0.1.8" }
-cranpose-godot = { path = "crates/cranpose-godot", version = "0.1.8" }
-cranpose-gpu-interop = { path = "crates/cranpose-gpu-interop", version = "0.1.8" }
+cranpose-bevy = { path = "crates/cranpose-bevy", version = "0.1.9" }
+cranpose-godot = { path = "crates/cranpose-godot", version = "0.1.9" }
+cranpose-gpu-interop = { path = "crates/cranpose-gpu-interop", version = "0.1.9" }
 demo-scene = { path = "examples/demo-scene" }
 demo-ui = { path = "examples/demo-ui" }
 godot = { version = "0.5.5", features = ["api-4-7"] }

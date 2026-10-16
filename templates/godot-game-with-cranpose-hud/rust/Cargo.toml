@@ -12,7 +12,7 @@ cranpose = { version = "0.13.0", default-features = false, features = [
     "renderer-wgpu",
     "embedded-default-font",
 ] }
-cranpose-godot = "0.1.8"
+cranpose-godot = "0.1.9"
 godot = { version = "0.5.5", features = ["api-4-7"] }
 
 [profile.dev]

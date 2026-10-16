@@ -16,7 +16,7 @@ cranpose = { version = "0.13.0", default-features = false, features = [
     "renderer-wgpu",
     "embedded-default-font",
 ] }
-cranpose-bevy = "0.1.8"
+cranpose-bevy = "0.1.9"
 
 [profile.dev]
 opt-level = 1
