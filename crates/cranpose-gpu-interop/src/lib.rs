@@ -15,7 +15,7 @@ pub mod gl;
 mod gl_names;
 #[cfg(all(feature = "godot", target_vendor = "apple"))]
 pub mod godot;
-#[cfg(target_vendor = "apple")]
+#[cfg(all(feature = "godot", target_vendor = "apple"))]
 mod metal;
 
 /// Why a native object could not become a wgpu object.

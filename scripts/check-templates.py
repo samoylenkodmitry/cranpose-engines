@@ -2,7 +2,7 @@
 """Checks every template against this checkout.
 
 Each template is copied to a scratch folder, as a developer would copy it,
-and its git dependencies on this repository are pointed at the local crates.
+and its dependencies on this repository's crates are pointed at the local ones.
 Then cargo runs clippy (the default) or the given cargo command in it.
 
     scripts/check-templates.py            # clippy, warnings are errors
@@ -21,13 +21,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPOSITORY = "https://github.com/samoylenkodmitry/cranpose-engines"
 LOCAL = {
     "cranpose-bevy": ROOT / "crates" / "cranpose-bevy",
     "cranpose-godot": ROOT / "crates" / "cranpose-godot",
 }
-GIT_DEPENDENCY = re.compile(
-    r'^(?P<name>[\w-]+) = \{ git = "' + re.escape(REPOSITORY) + r'", tag = "[^"]+" \}$',
+ENGINE_DEPENDENCY = re.compile(
+    r'^(?P<name>' + "|".join(map(re.escape, LOCAL)) + r') = "[^"]+"$',
     re.MULTILINE,
 )
 
@@ -38,11 +37,9 @@ CRANPOSE_DEPENDENCY = re.compile(r'^cranpose = \{ version = "[^"]+",', re.MULTIL
 def local_manifest(text: str) -> str:
     def to_path(match: re.Match) -> str:
         name = match.group("name")
-        if name not in LOCAL:
-            sys.exit(f"no local crate for the template dependency {name}")
         return f'{name} = {{ path = "{LOCAL[name]}" }}'
 
-    text = GIT_DEPENDENCY.sub(to_path, text)
+    text = ENGINE_DEPENDENCY.sub(to_path, text)
     cranpose = os.environ.get("CRANPOSE_PATH")
     if cranpose:
         local = Path(cranpose) / "crates" / "cranpose"
