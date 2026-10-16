@@ -79,6 +79,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pkg-config libudev-dev libasound2-dev libwayland-dev libxkbcommon-dev
+      # wgpu's DXC (mach-dxcompiler-rs) asks the GitHub API whether its
+      # release is immutable before downloading it. Without a token, the
+      # runners share one rate limit and the build fails when it is spent.
+      - name: Give curl the job's GitHub token
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" > "$RUNNER_TEMP/.curlrc"
+          echo "CURL_HOME=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
