@@ -30,12 +30,12 @@ cranpose = { workspace = true, features = ["renderer-wgpu"] }
 wgpu = { workspace = true }
 
 [target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
-wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false }
+wgpu = { package = "cranpose-wgpu", version = "30.0.21", default-features = false }
 
 # Bevy's PBR shaders name textures with `let`, which Safari's WGSL compiler
 # rejects; the fork rewrites those shaders for such browsers.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wgpu = { package = "cranpose-wgpu", version = "30.0.20", default-features = false, features = ["portable-wgsl"] }
+wgpu = { package = "cranpose-wgpu", version = "30.0.21", default-features = false, features = ["portable-wgsl"] }
 
 [dev-dependencies]
 cranpose = { workspace = true, features = ["renderer-wgpu"] }
