@@ -1,6 +1,8 @@
 name: Pages
 
 # A version tag builds the web examples and publishes them to GitHub Pages.
+# The builds check out the tag by name: the release job may move the tag onto
+# its version commit after this run starts.
 on:
   push:
     tags: ["v*"]
@@ -26,6 +28,8 @@ jobs:
         build: [webgpu, webgl2]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -50,6 +54,8 @@ jobs:
       GODOT: ${{ github.workspace }}/godot/Godot_v4.7.2-stable_linux.x86_64
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref }}
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-10-03
