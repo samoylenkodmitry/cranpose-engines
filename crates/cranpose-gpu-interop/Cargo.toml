@@ -23,14 +23,14 @@ thiserror = "2"
 wgpu = { workspace = true, features = ["metal", "std", "wgsl"] }
 
 [target.'cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))'.dependencies]
-wgpu = { package = "cranpose-wgpu", version = "30.0.21", default-features = false, features = ["metal", "std", "wgsl"] }
+wgpu = { package = "cranpose-wgpu", version = "30.0.24", default-features = false, features = ["metal", "std", "wgsl"] }
 
 # A web export's module, such as Godot's, draws with the GL context its host
 # made current.
 [target.'cfg(target_os = "emscripten")'.dependencies]
 glow = "0.18"
-wgpu = { package = "cranpose-wgpu", version = "30.0.21", default-features = false, features = ["gles", "fragile-send-sync-non-atomic-wasm"] }
-wgpu-hal = { package = "cranpose-wgpu-hal", version = "30.0.16", features = ["gles"] }
+wgpu = { package = "cranpose-wgpu", version = "30.0.24", default-features = false, features = ["gles", "fragile-send-sync-non-atomic-wasm"] }
+wgpu-hal = { package = "cranpose-wgpu-hal", version = "30.0.19", features = ["gles"] }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 # Godot's Metal device, for `godot`. On the web, Godot shares its WebGL2
