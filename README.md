@@ -180,15 +180,14 @@ Progress and the open work are tracked in
 
 ## How the device is shared
 
-Bevy 0.20 builds against wgpu 30. On macOS, Windows and Linux Cranpose takes
-the same wgpu from crates.io, so Bevy and Cranpose use one `wgpu::Device` type
-and one device, and frames pass between them as textures, with no copies and
-no unsafe code. On the web, Android and iOS Cranpose takes its fork of wgpu
-30. [`wgpu-shim`](wgpu-shim) is a package named `wgpu` that re-exports the
-fork, and a web build patches crates.io's `wgpu` with it, so Bevy builds
-against the fork there. Cargo ignores a `[patch]` entry that renames a
-package, so the re-export package is needed. This workspace patches on every
-target, since its Bevy demos also build for the web.
+Bevy 0.20 builds against wgpu 30. Since Cranpose 0.16 every target, desktop
+included, renders with Cranpose's fork of wgpu 30. [`wgpu-shim`](wgpu-shim) is
+a package named `wgpu` that re-exports the fork, and a build of Bevy patches
+crates.io's `wgpu` with it, so Bevy builds against the fork. Then Bevy and
+Cranpose use one `wgpu::Device` type and one device, and frames pass between
+them as textures, with no copies and no unsafe code. Cargo ignores a `[patch]`
+entry that renames a package, so the re-export package is needed. This
+workspace and the three templates patch on every target.
 
 - **Bevy inside Cranpose.** `cranpose_bevy::BevyView` (which
   `rememberBevyView` starts and `BevyScene` shows) runs Bevy on a thread of its

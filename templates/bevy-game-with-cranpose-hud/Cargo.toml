@@ -10,7 +10,7 @@ bevy = { version = "0.20", default-features = false, features = [
     "default_platform",
     "3d_bevy_render",
 ] }
-cranpose = { version = "0.13.0", default-features = false, features = [
+cranpose = { version = "0.17.2", default-features = false, features = [
     "renderer-wgpu",
     "embedded-default-font",
 ] }
@@ -21,5 +21,11 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# Bevy builds against crates.io's wgpu, and Cranpose renders with its fork of
+# wgpu on every target. This package is named `wgpu` and re-exports the fork,
+# so Bevy and Cranpose share one `wgpu::Device` type.
+[patch.crates-io]
+wgpu = { git = "https://github.com/samoylenkodmitry/cranpose-engines", branch = "main" }
 
 [workspace]

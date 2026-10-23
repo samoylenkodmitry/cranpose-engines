@@ -32,6 +32,10 @@ ENGINE_DEPENDENCY = re.compile(
 
 
 CRANPOSE_DEPENDENCY = re.compile(r'^cranpose = \{ version = "[^"]+",', re.MULTILINE)
+# The `[patch.crates-io]` entry that points Bevy's wgpu at the shim in this repository.
+SHIM_PATCH = re.compile(
+    r'^wgpu = \{ git = "https://github.com/samoylenkodmitry/cranpose-engines"[^}]*\}$', re.MULTILINE
+)
 
 
 def local_manifest(text: str) -> str:
@@ -40,6 +44,7 @@ def local_manifest(text: str) -> str:
         return f'{name} = {{ path = "{LOCAL[name]}" }}'
 
     text = ENGINE_DEPENDENCY.sub(to_path, text)
+    text = SHIM_PATCH.sub(f'wgpu = {{ path = "{ROOT / "wgpu-shim"}" }}', text)
     cranpose = os.environ.get("CRANPOSE_PATH")
     if cranpose:
         local = Path(cranpose) / "crates" / "cranpose"
